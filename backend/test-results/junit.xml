@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="3" failures="0" errors="0" time="26.336">
+  <testsuite name="Enums smoke" errors="0" failures="0" skipped="0" timestamp="2025-12-15T23:02:40" time="16.105" tests="2">
+    <testcase classname="Enums smoke" name="has prize categories aligned with current schema" time="0.018">
+    </testcase>
+    <testcase classname="Enums smoke" name="has reward categories aligned with current schema" time="0.001">
+    </testcase>
+  </testsuite>
+  <testsuite name="PrizeService smoke" errors="0" failures="0" skipped="0" timestamp="2025-12-15T23:02:40" time="25.017" tests="1">
+    <testcase classname="PrizeService smoke" name="exposes read/list endpoints" time="0.011">
+    </testcase>
+  </testsuite>
+</testsuites>

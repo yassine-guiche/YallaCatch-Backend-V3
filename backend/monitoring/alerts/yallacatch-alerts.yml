@@ -1,0 +1,292 @@
+# YallaCatch Backend Alert Rules
+groups:
+  - name: yallacatch-api
+    rules:
+      # API Health Alerts
+      - alert: APIDown
+        expr: up{job="yallacatch-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: api
+        annotations:
+          summary: "YallaCatch API is down"
+          description: "The YallaCatch API has been down for more than 1 minute."
+
+      - alert: APIHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="yallacatch-api"}[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: api
+        annotations:
+          summary: "High API latency detected"
+          description: "95th percentile latency is {{ $value }}s for the last 5 minutes."
+
+      - alert: APIHighErrorRate
+        expr: rate(http_requests_total{job="yallacatch-api",status=~"5.."}[5m]) / rate(http_requests_total{job="yallacatch-api"}[5m]) > 0.05
+        for: 3m
+        labels:
+          severity: critical
+          service: api
+        annotations:
+          summary: "High API error rate"
+          description: "API error rate is {{ $value | humanizePercentage }} for the last 5 minutes."
+
+      - alert: APILowThroughput
+        expr: rate(http_requests_total{job="yallacatch-api"}[5m]) < 1
+        for: 10m
+        labels:
+          severity: warning
+          service: api
+        annotations:
+          summary: "Low API throughput"
+          description: "API throughput is {{ $value }} requests/second for the last 10 minutes."
+
+  - name: yallacatch-database
+    rules:
+      # MongoDB Alerts
+      - alert: MongoDBDown
+        expr: up{job="mongodb-exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "MongoDB is down"
+          description: "MongoDB has been down for more than 1 minute."
+
+      - alert: MongoDBHighConnections
+        expr: mongodb_connections{state="current"} / mongodb_connections{state="available"} > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "MongoDB high connection usage"
+          description: "MongoDB connection usage is {{ $value | humanizePercentage }}."
+
+      - alert: MongoDBReplicationLag
+        expr: mongodb_replset_member_replication_lag > 10
+        for: 2m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "MongoDB replication lag"
+          description: "MongoDB replication lag is {{ $value }}s on {{ $labels.instance }}."
+
+      - alert: MongoDBDiskSpaceLow
+        expr: (mongodb_ss_wt_cache_bytes_currently_in_cache / mongodb_ss_wt_cache_maximum_bytes_configured) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "MongoDB cache usage high"
+          description: "MongoDB cache usage is {{ $value | humanizePercentage }}."
+
+  - name: yallacatch-cache
+    rules:
+      # Redis Alerts
+      - alert: RedisDown
+        expr: up{job="redis-exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: cache
+        annotations:
+          summary: "Redis is down"
+          description: "Redis has been down for more than 1 minute."
+
+      - alert: RedisHighMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          service: cache
+        annotations:
+          summary: "Redis high memory usage"
+          description: "Redis memory usage is {{ $value | humanizePercentage }}."
+
+      - alert: RedisHighConnections
+        expr: redis_connected_clients > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: cache
+        annotations:
+          summary: "Redis high connection count"
+          description: "Redis has {{ $value }} connected clients."
+
+      - alert: RedisSlowQueries
+        expr: increase(redis_slowlog_length[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          service: cache
+        annotations:
+          summary: "Redis slow queries detected"
+          description: "Redis has {{ $value }} slow queries in the last 5 minutes."
+
+  - name: yallacatch-system
+    rules:
+      # System Resource Alerts
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}% on {{ $labels.instance }}."
+
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}."
+
+      - alert: DiskSpaceLow
+        expr: (1 - (node_filesystem_avail_bytes{fstype!="tmpfs"} / node_filesystem_size_bytes{fstype!="tmpfs"})) > 0.9
+        for: 5m
+        labels:
+          severity: critical
+          service: system
+        annotations:
+          summary: "Low disk space"
+          description: "Disk usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}:{{ $labels.mountpoint }}."
+
+      - alert: HighDiskIOWait
+        expr: rate(node_cpu_seconds_total{mode="iowait"}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High disk I/O wait"
+          description: "Disk I/O wait is {{ $value | humanizePercentage }} on {{ $labels.instance }}."
+
+  - name: yallacatch-business
+    rules:
+      # Business Logic Alerts
+      - alert: HighClaimFailureRate
+        expr: rate(yallacatch_claims_total{status="failed"}[5m]) / rate(yallacatch_claims_total[5m]) > 0.1
+        for: 3m
+        labels:
+          severity: warning
+          service: business
+        annotations:
+          summary: "High claim failure rate"
+          description: "Claim failure rate is {{ $value | humanizePercentage }} for the last 5 minutes."
+
+      - alert: LowPrizeAvailability
+        expr: yallacatch_prizes_available < 100
+        for: 10m
+        labels:
+          severity: warning
+          service: business
+        annotations:
+          summary: "Low prize availability"
+          description: "Only {{ $value }} prizes are available."
+
+      - alert: HighRedemptionFailureRate
+        expr: rate(yallacatch_redemptions_total{status="failed"}[5m]) / rate(yallacatch_redemptions_total[5m]) > 0.05
+        for: 3m
+        labels:
+          severity: warning
+          service: business
+        annotations:
+          summary: "High redemption failure rate"
+          description: "Redemption failure rate is {{ $value | humanizePercentage }} for the last 5 minutes."
+
+      - alert: SuspiciousUserActivity
+        expr: increase(yallacatch_security_violations_total[5m]) > 10
+        for: 1m
+        labels:
+          severity: critical
+          service: security
+        annotations:
+          summary: "Suspicious user activity detected"
+          description: "{{ $value }} security violations detected in the last 5 minutes."
+
+  - name: yallacatch-external
+    rules:
+      # External Service Alerts
+      - alert: ExternalServiceDown
+        expr: probe_success{job="blackbox-http"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: external
+        annotations:
+          summary: "External service unreachable"
+          description: "{{ $labels.instance }} has been unreachable for more than 2 minutes."
+
+      - alert: ExternalServiceSlowResponse
+        expr: probe_duration_seconds{job="blackbox-http"} > 5
+        for: 3m
+        labels:
+          severity: warning
+          service: external
+        annotations:
+          summary: "External service slow response"
+          description: "{{ $labels.instance }} response time is {{ $value }}s."
+
+      - alert: SSLCertificateExpiringSoon
+        expr: probe_ssl_earliest_cert_expiry - time() < 7 * 24 * 3600
+        for: 1h
+        labels:
+          severity: warning
+          service: security
+        annotations:
+          summary: "SSL certificate expiring soon"
+          description: "SSL certificate for {{ $labels.instance }} expires in {{ $value | humanizeDuration }}."
+
+  - name: yallacatch-containers
+    rules:
+      # Container Alerts
+      - alert: ContainerDown
+        expr: absent(container_last_seen{name=~"yallacatch-.*"})
+        for: 1m
+        labels:
+          severity: critical
+          service: container
+        annotations:
+          summary: "Container is down"
+          description: "Container {{ $labels.name }} is not running."
+
+      - alert: ContainerHighCPU
+        expr: rate(container_cpu_usage_seconds_total{name=~"yallacatch-.*"}[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: container
+        annotations:
+          summary: "Container high CPU usage"
+          description: "Container {{ $labels.name }} CPU usage is {{ $value | humanizePercentage }}."
+
+      - alert: ContainerHighMemory
+        expr: container_memory_usage_bytes{name=~"yallacatch-.*"} / container_spec_memory_limit_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          service: container
+        annotations:
+          summary: "Container high memory usage"
+          description: "Container {{ $labels.name }} memory usage is {{ $value | humanizePercentage }}."
+
+      - alert: ContainerRestartLoop
+        expr: increase(container_restart_count{name=~"yallacatch-.*"}[1h]) > 5
+        for: 5m
+        labels:
+          severity: critical
+          service: container
+        annotations:
+          summary: "Container restart loop"
+          description: "Container {{ $labels.name }} has restarted {{ $value }} times in the last hour."

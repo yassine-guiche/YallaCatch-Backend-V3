@@ -1,0 +1,320 @@
+import { MongoMemoryServer } from 'mongodb-memory-server';
+import { RedisMemoryServer } from 'redis-memory-server';
+import mongoose from 'mongoose';
+import Redis from 'ioredis';
+import { config } from '../src/config';
+import { logger } from '../src/lib/logger';
+
+// Global test variables
+declare global {
+  var __MONGO_URI__: string;
+  var __MONGO_DB_NAME__: string;
+  var __REDIS_HOST__: string;
+  var __REDIS_PORT__: number;
+  var mongoServer: MongoMemoryServer;
+  var redisServer: RedisMemoryServer;
+  var testRedisClient: Redis;
+}
+
+/**
+ * Setup test environment
+ */
+beforeAll(async () => {
+  // Silence logger during tests
+  logger.level = 'silent';
+
+  // Start MongoDB Memory Server
+  if (!global.mongoServer) {
+    global.mongoServer = await MongoMemoryServer.create({
+      binary: {
+        version: '6.0.0',
+      },
+      instance: {
+        dbName: 'yallacatch_test',
+      },
+    });
+  }
+
+  global.__MONGO_URI__ = global.mongoServer.getUri();
+  global.__MONGO_DB_NAME__ = 'yallacatch_test';
+
+  // Start Redis Memory Server
+  if (!global.redisServer) {
+    global.redisServer = new RedisMemoryServer();
+    await global.redisServer.start();
+  }
+
+  global.__REDIS_HOST__ = await global.redisServer.getHost();
+  global.__REDIS_PORT__ = await global.redisServer.getPort();
+
+  // Connect to test databases
+  await mongoose.connect(global.__MONGO_URI__, {
+    dbName: global.__MONGO_DB_NAME__,
+  });
+
+  global.testRedisClient = new Redis({
+    host: global.__REDIS_HOST__,
+    port: global.__REDIS_PORT__,
+    retryDelayOnFailover: 100,
+    maxRetriesPerRequest: 1,
+  });
+
+  // Set test environment variables
+  process.env.NODE_ENV = 'test';
+  process.env.MONGODB_URI = global.__MONGO_URI__;
+  process.env.REDIS_URL = `redis://${global.__REDIS_HOST__}:${global.__REDIS_PORT__}`;
+  process.env.JWT_PRIVATE_KEY_BASE64 = Buffer.from(TEST_PRIVATE_KEY).toString('base64');
+  process.env.JWT_PUBLIC_KEY_BASE64 = Buffer.from(TEST_PUBLIC_KEY).toString('base64');
+});
+
+/**
+ * Cleanup after each test
+ */
+afterEach(async () => {
+  // Clear all collections
+  const collections = mongoose.connection.collections;
+  for (const key in collections) {
+    const collection = collections[key];
+    await collection.deleteMany({});
+  }
+
+  // Clear Redis
+  await global.testRedisClient.flushall();
+});
+
+/**
+ * Cleanup after all tests
+ */
+afterAll(async () => {
+  // Close database connections
+  await mongoose.connection.close();
+  await global.testRedisClient.quit();
+
+  // Stop servers
+  if (global.mongoServer) {
+    await global.mongoServer.stop();
+  }
+  if (global.redisServer) {
+    await global.redisServer.stop();
+  }
+});
+
+/**
+ * Test RSA key pair for JWT testing
+ */
+const TEST_PRIVATE_KEY = `-----BEGIN PRIVATE KEY-----
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC7VJTUt9Us8cKB
+UOoZjd2MCEfQxWCWYfh+WieMg3a3Jm4OuSXo+A2GjzAO73fcBE6f5JJjBdqE1jK
+7+geqkmjIXiJz5r4+kXGSS2ZDpNt+puadKNcpd1N6hzuoaKKKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKwIDAQAB
+-----END PRIVATE KEY-----`;
+
+const TEST_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAu1SU1L7VLPHCgVDqGY3d
+jAhH0MVglmH4flYnjIN2tyZuDrkl6PgNho8wDu933AROl+SSYwXahNYyu/oHqpJo
+yF4ic+a+PpFxkktmQ6TbfqbmnSjXKXdTeoc7qGiiiiiiiiiiiiiiiiiiiiiiiiiii
+iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
+iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
+iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
+iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
+iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
+iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
+iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
+iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
+QIDAQAB
+-----END PUBLIC KEY-----`;
+
+/**
+ * Test utilities
+ */
+export const testUtils = {
+  /**
+   * Create a test user
+   */
+  async createTestUser(overrides: any = {}) {
+    const { User } = await import('../src/models/User');
+    const { UserRole, Platform } = await import('../src/types');
+    
+    const userData = {
+      email: 'test@example.com',
+      displayName: 'Test User',
+      role: UserRole.PLAYER,
+      level: 'bronze',
+      points: {
+        total: 100,
+        available: 100,
+        spent: 0,
+      },
+      location: {
+        type: 'Point',
+        coordinates: [10.1815, 36.8065], // Tunis
+        city: 'Tunis',
+      },
+      devices: [{
+        deviceId: 'test-device-123',
+        platform: Platform.WEB,
+        lastUsed: new Date(),
+        isActive: true,
+      }],
+      ...overrides,
+    };
+
+    const user = new User(userData);
+    await user.save();
+    return user;
+  },
+
+  /**
+   * Create a test prize
+   */
+  async createTestPrize(overrides: any = {}) {
+    const { Prize } = await import('../src/models/Prize');
+    const { PrizeCategory } = await import('../src/types');
+    
+    const prizeData = {
+      name: 'Test Prize',
+      description: 'A test prize for testing',
+      category: PrizeCategory.FOOD,
+      points: 50,
+      location: {
+        type: 'Point',
+        coordinates: [10.1815, 36.8065], // Tunis
+      },
+      city: 'Tunis',
+      status: 'active',
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+      ...overrides,
+    };
+
+    const prize = new Prize(prizeData);
+    await prize.save();
+    return prize;
+  },
+
+  /**
+   * Create a test reward
+   */
+  async createTestReward(overrides: any = {}) {
+    const { Reward } = await import('../src/models/Reward');
+    const { RewardCategory } = await import('../src/types');
+    
+    const rewardData = {
+      name: 'Test Reward',
+      description: 'A test reward for testing',
+      category: RewardCategory.SHOPPING,
+      pointsCost: 100,
+      isActive: true,
+      stockTotal: 10,
+      stockAvailable: 10,
+      expiryDays: 30,
+      requiresApproval: false,
+      maxRedemptionsPerUser: 1,
+      ...overrides,
+    };
+
+    const reward = new Reward(rewardData);
+    await reward.save();
+    return reward;
+  },
+
+  /**
+   * Generate test JWT token
+   */
+  async generateTestToken(payload: any = {}) {
+    const { signTokenPair } = await import('../src/lib/jwt');
+    
+    const defaultPayload = {
+      sub: 'test-user-id',
+      role: 'player',
+      deviceId: 'test-device-123',
+      sessionId: 'test-session-123',
+    };
+
+    const tokens = signTokenPair({ ...defaultPayload, ...payload });
+    return tokens.accessToken;
+  },
+
+  /**
+   * Wait for a specified time
+   */
+  wait: (ms: number) => new Promise(resolve => setTimeout(resolve, ms)),
+
+  /**
+   * Generate random coordinates within Tunisia
+   */
+  generateTunisianCoordinates() {
+    const tunisiaBounds = {
+      north: 37.5439,
+      south: 30.2407,
+      east: 11.5998,
+      west: 7.5244,
+    };
+
+    return {
+      lat: tunisiaBounds.south + Math.random() * (tunisiaBounds.north - tunisiaBounds.south),
+      lng: tunisiaBounds.west + Math.random() * (tunisiaBounds.east - tunisiaBounds.west),
+    };
+  },
+
+  /**
+   * Mock external service responses
+   */
+  mockExternalServices() {
+    // Mock Firebase Admin
+    jest.mock('firebase-admin', () => ({
+      app: jest.fn(() => ({})),
+      messaging: jest.fn(() => ({
+        send: jest.fn().mockResolvedValue({ messageId: 'test-message-id' }),
+        sendMulticast: jest.fn().mockResolvedValue({
+          successCount: 1,
+          failureCount: 0,
+          responses: [{ success: true, messageId: 'test-message-id' }],
+        }),
+      })),
+    }));
+
+    // Mock AWS S3
+    jest.mock('@aws-sdk/client-s3', () => ({
+      S3Client: jest.fn(() => ({
+        send: jest.fn().mockResolvedValue({}),
+      })),
+      PutObjectCommand: jest.fn(),
+      GetObjectCommand: jest.fn(),
+      DeleteObjectCommand: jest.fn(),
+    }));
+
+    // Mock Nodemailer
+    jest.mock('nodemailer', () => ({
+      createTransporter: jest.fn(() => ({
+        sendMail: jest.fn().mockResolvedValue({
+          messageId: 'test-email-id',
+          accepted: ['test@example.com'],
+          rejected: [],
+        }),
+      })),
+    }));
+
+    // Mock Twilio
+    jest.mock('twilio', () => ({
+      Twilio: jest.fn(() => ({
+        messages: {
+          create: jest.fn().mockResolvedValue({
+            sid: 'test-sms-id',
+            status: 'sent',
+          }),
+        },
+      })),
+    }));
+  },
+};
+
+// Export for use in tests
+export { TEST_PRIVATE_KEY, TEST_PUBLIC_KEY };

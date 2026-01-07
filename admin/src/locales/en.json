@@ -1,0 +1,98 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "search": "Search",
+    "filter": "Filter",
+    "export": "Export",
+    "import": "Import",
+    "refresh": "Refresh",
+    "close": "Close",
+    "yes": "Yes",
+    "no": "No",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "submit": "Submit",
+    "reset": "Reset"
+  },
+  "auth": {
+    "login": "Login",
+    "logout": "Logout",
+    "email": "Email",
+    "password": "Password",
+    "forgotPassword": "Forgot password?",
+    "rememberMe": "Remember me",
+    "loginButton": "Sign in",
+    "loginError": "Invalid credentials",
+    "loginSuccess": "Login successful"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "totalUsers": "Total Users",
+    "activeUsers": "Active Users",
+    "totalPrizes": "Total Prizes",
+    "capturedPrizes": "Captured Prizes",
+    "conversionRate": "Conversion Rate",
+    "revenue": "Revenue Generated"
+  },
+  "users": {
+    "title": "User Management",
+    "list": "User List",
+    "create": "Create User",
+    "edit": "Edit User",
+    "delete": "Delete User",
+    "name": "Name",
+    "email": "Email",
+    "role": "Role",
+    "status": "Status",
+    "createdAt": "Created At",
+    "lastLogin": "Last Login",
+    "actions": "Actions"
+  },
+  "prizes": {
+    "title": "Prize Management",
+    "list": "Prize List",
+    "create": "Create Prize",
+    "edit": "Edit Prize",
+    "delete": "Delete Prize",
+    "name": "Name",
+    "description": "Description",
+    "category": "Category",
+    "value": "Value",
+    "status": "Status",
+    "location": "Location",
+    "expiresAt": "Expires At"
+  },
+  "game": {
+    "monitoring": {
+      "title": "Game Monitoring",
+      "activeSessions": "Active Sessions",
+      "realtimeStats": "Real-time Statistics",
+      "playerActivity": "Player Activity",
+      "serverHealth": "Server Health"
+    }
+  },
+  "notifications": {
+    "title": "Notifications",
+    "send": "Send Notification",
+    "broadcast": "Broadcast",
+    "templates": "Templates",
+    "history": "History"
+  },
+  "settings": {
+    "title": "Settings",
+    "general": "General",
+    "game": "Game Settings",
+    "antiCheat": "Anti-Cheat",
+    "progression": "Progression",
+    "offline": "Offline Settings"
+  }
+}

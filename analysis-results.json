@@ -1,0 +1,1939 @@
+{
+  "modules": [
+    {
+      "name": "admin",
+      "files": [
+        "admin-extended.ts",
+        "index.ts",
+        "routes.ts"
+      ],
+      "routes_by_file": {
+        "admin-extended.ts": [
+          {
+            "method": "GET",
+            "path": "/dashboard/real-time",
+            "line": 854,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/users",
+            "line": 867,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/users/:id/ban",
+            "line": 880,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/users/:id/unban",
+            "line": 898,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/prizes",
+            "line": 912,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/prizes",
+            "line": 925,
+            "is_admin": true
+          },
+          {
+            "method": "PUT",
+            "path": "/prizes/:id",
+            "line": 938,
+            "is_admin": true
+          },
+          {
+            "method": "DELETE",
+            "path": "/prizes/:id",
+            "line": 956,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/analytics",
+            "line": 970,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/notifications/send",
+            "line": 987,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/logs",
+            "line": 1000,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/backup/create",
+            "line": 1013,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/claims",
+            "line": 1028,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/claims/:id",
+            "line": 1068,
+            "is_admin": true
+          },
+          {
+            "method": "PATCH",
+            "path": "/claims/:id/validate",
+            "line": 1087,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/claims/stats",
+            "line": 1127,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/rewards",
+            "line": 1160,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/rewards",
+            "line": 1194,
+            "is_admin": true
+          },
+          {
+            "method": "PUT",
+            "path": "/rewards/:id",
+            "line": 1223,
+            "is_admin": true
+          },
+          {
+            "method": "DELETE",
+            "path": "/rewards/:id",
+            "line": 1254,
+            "is_admin": true
+          },
+          {
+            "method": "PATCH",
+            "path": "/rewards/:id/stock",
+            "line": 1281,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/achievements",
+            "line": 1318,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/achievements",
+            "line": 1350,
+            "is_admin": true
+          },
+          {
+            "method": "PUT",
+            "path": "/achievements/:id",
+            "line": 1374,
+            "is_admin": true
+          },
+          {
+            "method": "DELETE",
+            "path": "/achievements/:id",
+            "line": 1405,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/marketplace/items",
+            "line": 1434,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/marketplace/items",
+            "line": 1467,
+            "is_admin": true
+          },
+          {
+            "method": "PUT",
+            "path": "/marketplace/items/:id",
+            "line": 1493,
+            "is_admin": true
+          },
+          {
+            "method": "DELETE",
+            "path": "/marketplace/items/:id",
+            "line": 1515,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/marketplace/redemptions",
+            "line": 1528,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/marketplace/stats",
+            "line": 1563,
+            "is_admin": true
+          },
+          {
+            "method": "PATCH",
+            "path": "/marketplace/redemptions/:id/validate",
+            "line": 1594,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/partners",
+            "line": 1629,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/partners/:id",
+            "line": 1661,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/partners",
+            "line": 1674,
+            "is_admin": true
+          },
+          {
+            "method": "PUT",
+            "path": "/partners/:id",
+            "line": 1698,
+            "is_admin": true
+          },
+          {
+            "method": "DELETE",
+            "path": "/partners/:id",
+            "line": 1729,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/distribution/settings",
+            "line": 1758,
+            "is_admin": true
+          },
+          {
+            "method": "PUT",
+            "path": "/distribution/settings",
+            "line": 1770,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/distribution/history",
+            "line": 1797,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/distribution/trigger",
+            "line": 1825,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/reports",
+            "line": 1861,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/reports/:id",
+            "line": 1895,
+            "is_admin": true
+          },
+          {
+            "method": "PATCH",
+            "path": "/reports/:id/resolve",
+            "line": 1914,
+            "is_admin": true
+          },
+          {
+            "method": "PATCH",
+            "path": "/reports/:id/dismiss",
+            "line": 1951,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/reports/stats",
+            "line": 1988,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/sessions/active",
+            "line": 2010,
+            "is_admin": true
+          },
+          {
+            "method": "DELETE",
+            "path": "/sessions/:id",
+            "line": 2039,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/sessions/stats",
+            "line": 2070,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/friendships",
+            "line": 2091,
+            "is_admin": true
+          },
+          {
+            "method": "DELETE",
+            "path": "/friendships/:id",
+            "line": 2124,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/codes",
+            "line": 2153,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/codes/generate",
+            "line": 2187,
+            "is_admin": true
+          },
+          {
+            "method": "PATCH",
+            "path": "/codes/:id/deactivate",
+            "line": 2225,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/ar-sessions",
+            "line": 2258,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/ar-sessions/stats",
+            "line": 2292,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/offline-queue",
+            "line": 2313,
+            "is_admin": true
+          },
+          {
+            "method": "DELETE",
+            "path": "/offline-queue/clear",
+            "line": 2346,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/device-tokens",
+            "line": 2372,
+            "is_admin": true
+          },
+          {
+            "method": "DELETE",
+            "path": "/device-tokens/:id",
+            "line": 2405,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/device-tokens/stats",
+            "line": 2436,
+            "is_admin": true
+          }
+        ],
+        "index.ts": [
+          {
+            "method": "GET",
+            "path": "/dashboard",
+            "line": 133,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/audit-logs",
+            "line": 146,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/users",
+            "line": 159,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/users/:userId",
+            "line": 180,
+            "is_admin": true
+          },
+          {
+            "method": "PATCH",
+            "path": "/users/:userId",
+            "line": 193,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/users/:userId/ban",
+            "line": 210,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/users/:userId/unban",
+            "line": 238,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/users/:userId/points",
+            "line": 256,
+            "is_admin": true
+          },
+          {
+            "method": "DELETE",
+            "path": "/users/:userId",
+            "line": 320,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/prizes",
+            "line": 339,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/prizes/:prizeId",
+            "line": 376,
+            "is_admin": true
+          },
+          {
+            "method": "PATCH",
+            "path": "/prizes/:prizeId",
+            "line": 391,
+            "is_admin": true
+          },
+          {
+            "method": "DELETE",
+            "path": "/prizes/:prizeId",
+            "line": 414,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/notifications",
+            "line": 432,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/notifications/send",
+            "line": 449,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/notifications/broadcast",
+            "line": 466,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/rewards",
+            "line": 487,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/rewards/analytics",
+            "line": 508,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/rewards",
+            "line": 532,
+            "is_admin": true
+          },
+          {
+            "method": "PATCH",
+            "path": "/rewards/:rewardId",
+            "line": 544,
+            "is_admin": true
+          },
+          {
+            "method": "DELETE",
+            "path": "/rewards/:rewardId",
+            "line": 561,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/settings",
+            "line": 580,
+            "is_admin": true
+          },
+          {
+            "method": "PATCH",
+            "path": "/settings",
+            "line": 592,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/system/health",
+            "line": 611,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/system/metrics",
+            "line": 624,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/system/logs",
+            "line": 653,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/system/backup",
+            "line": 667,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/system/restore",
+            "line": 678,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/maintenance/start",
+            "line": 690,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/maintenance/stop",
+            "line": 707,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/activity-logs",
+            "line": 725,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/captures",
+            "line": 752,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/captures/:id/validate",
+            "line": 776,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/captures/analytics",
+            "line": 791,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/redemptions",
+            "line": 809,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/redemptions/:id/validate",
+            "line": 831,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/analytics/users",
+            "line": 846,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/analytics/prizes",
+            "line": 862,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/analytics/business",
+            "line": 880,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/analytics/heatmap",
+            "line": 903,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/activity-logs",
+            "line": 919,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/activity-logs/statistics",
+            "line": 941,
+            "is_admin": true
+          },
+          {
+            "method": "DELETE",
+            "path": "/activity-logs/clear",
+            "line": 953,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/activity-logs/export",
+            "line": 969,
+            "is_admin": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "analytics",
+      "files": [
+        "index.ts",
+        "routes.ts"
+      ],
+      "routes_by_file": {
+        "index.ts": [
+          {
+            "method": "GET",
+            "path": "/",
+            "line": 122,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/generate",
+            "line": 140,
+            "is_admin": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "ar",
+      "files": [
+        "index.ts",
+        "routes.ts"
+      ],
+      "routes_by_file": {
+        "index.ts": [
+          {
+            "method": "POST",
+            "path": "/view",
+            "line": 265,
+            "is_admin": false
+          },
+          {
+            "method": "POST",
+            "path": "/capture",
+            "line": 298,
+            "is_admin": false
+          },
+          {
+            "method": "POST",
+            "path": "/end",
+            "line": 327,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/model/:prizeId",
+            "line": 357,
+            "is_admin": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "auth",
+      "files": [
+        "auth-extended.ts",
+        "index.ts",
+        "routes.ts"
+      ],
+      "routes_by_file": {
+        "auth-extended.ts": [
+          {
+            "method": "POST",
+            "path": "/verify-email",
+            "line": 485,
+            "is_admin": false
+          },
+          {
+            "method": "POST",
+            "path": "/resend-verification",
+            "line": 496,
+            "is_admin": false
+          },
+          {
+            "method": "POST",
+            "path": "/send-phone-verification",
+            "line": 507,
+            "is_admin": false
+          },
+          {
+            "method": "POST",
+            "path": "/verify-phone",
+            "line": 525,
+            "is_admin": false
+          },
+          {
+            "method": "POST",
+            "path": "/change-password",
+            "line": 543,
+            "is_admin": false
+          },
+          {
+            "method": "DELETE",
+            "path": "/account",
+            "line": 561,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/stats",
+            "line": 579,
+            "is_admin": false
+          },
+          {
+            "method": "POST",
+            "path": "/avatar",
+            "line": 591,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/achievements",
+            "line": 607,
+            "is_admin": false
+          }
+        ],
+        "index.ts": [
+          {
+            "method": "GET",
+            "path": "/me",
+            "line": 516,
+            "is_admin": false
+          },
+          {
+            "method": "POST",
+            "path": "/guest",
+            "line": 534,
+            "is_admin": false
+          },
+          {
+            "method": "POST",
+            "path": "/register",
+            "line": 564,
+            "is_admin": false
+          },
+          {
+            "method": "POST",
+            "path": "/login",
+            "line": 586,
+            "is_admin": false
+          },
+          {
+            "method": "POST",
+            "path": "/refresh",
+            "line": 608,
+            "is_admin": false
+          },
+          {
+            "method": "POST",
+            "path": "/logout",
+            "line": 626,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/profile",
+            "line": 645,
+            "is_admin": false
+          },
+          {
+            "method": "PATCH",
+            "path": "/profile",
+            "line": 664,
+            "is_admin": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "capture",
+      "files": [
+        "routes.ts"
+      ],
+      "routes_by_file": {}
+    },
+    {
+      "name": "claims",
+      "files": [
+        "index.ts",
+        "routes.ts"
+      ],
+      "routes_by_file": {
+        "index.ts": [
+          {
+            "method": "POST",
+            "path": "/",
+            "line": 607,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/my-claims",
+            "line": 641,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/:claimId",
+            "line": 663,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/my-stats",
+            "line": 688,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/admin/all",
+            "line": 707,
+            "is_admin": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "distribution",
+      "files": [
+        "routes.ts"
+      ],
+      "routes_by_file": {}
+    },
+    {
+      "name": "game",
+      "files": [
+        "index.ts",
+        "routes.ts"
+      ],
+      "routes_by_file": {
+        "index.ts": [
+          {
+            "method": "POST",
+            "path": "/session/start",
+            "line": 563,
+            "is_admin": false
+          },
+          {
+            "method": "POST",
+            "path": "/session/end",
+            "line": 575,
+            "is_admin": false
+          },
+          {
+            "method": "POST",
+            "path": "/location/update",
+            "line": 590,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/leaderboard",
+            "line": 602,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/map/data",
+            "line": 619,
+            "is_admin": false
+          },
+          {
+            "method": "POST",
+            "path": "/power-ups/use",
+            "line": 636,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/challenges/daily",
+            "line": 648,
+            "is_admin": false
+          },
+          {
+            "method": "POST",
+            "path": "/challenges/complete",
+            "line": 660,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/inventory",
+            "line": 675,
+            "is_admin": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "gamification",
+      "files": [
+        "index.ts",
+        "routes.ts"
+      ],
+      "routes_by_file": {
+        "index.ts": [
+          {
+            "method": "GET",
+            "path": "/achievements",
+            "line": 125,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/achievements/recent",
+            "line": 137,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/achievements/all",
+            "line": 153,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/achievements",
+            "line": 165,
+            "is_admin": true
+          },
+          {
+            "method": "PUT",
+            "path": "/achievements/:achievementId",
+            "line": 195,
+            "is_admin": true
+          },
+          {
+            "method": "DELETE",
+            "path": "/achievements/:achievementId",
+            "line": 209,
+            "is_admin": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "integration",
+      "files": [
+        "routes.ts"
+      ],
+      "routes_by_file": {}
+    },
+    {
+      "name": "marketplace",
+      "files": [
+        "routes.ts"
+      ],
+      "routes_by_file": {}
+    },
+    {
+      "name": "notifications",
+      "files": [
+        "index.ts",
+        "notifications-extended.ts",
+        "push.ts",
+        "routes.ts"
+      ],
+      "routes_by_file": {
+        "index.ts": [
+          {
+            "method": "POST",
+            "path": "/",
+            "line": 132,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/",
+            "line": 145,
+            "is_admin": true
+          }
+        ],
+        "notifications-extended.ts": [
+          {
+            "method": "GET",
+            "path": "/",
+            "line": 427,
+            "is_admin": false
+          },
+          {
+            "method": "PUT",
+            "path": "/read",
+            "line": 443,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/settings",
+            "line": 455,
+            "is_admin": false
+          },
+          {
+            "method": "PUT",
+            "path": "/settings",
+            "line": 467,
+            "is_admin": false
+          },
+          {
+            "method": "POST",
+            "path": "/push/subscribe",
+            "line": 479,
+            "is_admin": false
+          },
+          {
+            "method": "DELETE",
+            "path": "/push/unsubscribe",
+            "line": 491,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/stats",
+            "line": 509,
+            "is_admin": false
+          }
+        ],
+        "push.ts": [
+          {
+            "method": "POST",
+            "path": "/register-device",
+            "line": 275,
+            "is_admin": false
+          },
+          {
+            "method": "POST",
+            "path": "/unregister-device",
+            "line": 299,
+            "is_admin": false
+          },
+          {
+            "method": "PUT",
+            "path": "/preferences",
+            "line": 324,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/preferences",
+            "line": 350,
+            "is_admin": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "offline",
+      "files": [
+        "index.ts",
+        "routes-old-backup.ts",
+        "routes.ts"
+      ],
+      "routes_by_file": {
+        "index.ts": [
+          {
+            "method": "POST",
+            "path": "/sync",
+            "line": 396,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/status",
+            "line": 420,
+            "is_admin": false
+          },
+          {
+            "method": "POST",
+            "path": "/retry",
+            "line": 451,
+            "is_admin": false
+          }
+        ],
+        "routes-old-backup.ts": [
+          {
+            "method": "POST",
+            "path": "/data/download",
+            "line": 663,
+            "is_admin": false
+          },
+          {
+            "method": "POST",
+            "path": "/sync",
+            "line": 675,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/capabilities",
+            "line": 687,
+            "is_admin": false
+          },
+          {
+            "method": "POST",
+            "path": "/validate",
+            "line": 699,
+            "is_admin": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "partners",
+      "files": [
+        "index.ts",
+        "routes.ts"
+      ],
+      "routes_by_file": {
+        "index.ts": [
+          {
+            "method": "POST",
+            "path": "/",
+            "line": 73,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/",
+            "line": 86,
+            "is_admin": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "prizes",
+      "files": [
+        "index.ts",
+        "routes.ts"
+      ],
+      "routes_by_file": {
+        "index.ts": [
+          {
+            "method": "GET",
+            "path": "/nearby",
+            "line": 528,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/city/:city",
+            "line": 552,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/:prizeId",
+            "line": 578,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/search",
+            "line": 615,
+            "is_admin": false
+          },
+          {
+            "method": "POST",
+            "path": "/",
+            "line": 636,
+            "is_admin": true
+          },
+          {
+            "method": "PATCH",
+            "path": "/:prizeId",
+            "line": 661,
+            "is_admin": true
+          },
+          {
+            "method": "DELETE",
+            "path": "/:prizeId",
+            "line": 689,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/bulk",
+            "line": 715,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/stats/:city?",
+            "line": 738,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/heatmap/:city?",
+            "line": 759,
+            "is_admin": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "rewards",
+      "files": [
+        "index.ts",
+        "rewards-extended.ts",
+        "routes.ts"
+      ],
+      "routes_by_file": {
+        "index.ts": [
+          {
+            "method": "GET",
+            "path": "/",
+            "line": 491,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/search",
+            "line": 510,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/:rewardId",
+            "line": 529,
+            "is_admin": false
+          },
+          {
+            "method": "POST",
+            "path": "/:rewardId/redeem",
+            "line": 554,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/my-redemptions",
+            "line": 591,
+            "is_admin": false
+          },
+          {
+            "method": "POST",
+            "path": "/admin",
+            "line": 615,
+            "is_admin": true
+          },
+          {
+            "method": "PATCH",
+            "path": "/admin/:rewardId",
+            "line": 638,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/admin/:rewardId/stock",
+            "line": 665,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/admin/stats",
+            "line": 692,
+            "is_admin": true
+          },
+          {
+            "method": "GET",
+            "path": "/admin/pending",
+            "line": 712,
+            "is_admin": true
+          }
+        ],
+        "rewards-extended.ts": [
+          {
+            "method": "GET",
+            "path": "/categories",
+            "line": 412,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/featured",
+            "line": 422,
+            "is_admin": false
+          },
+          {
+            "method": "POST",
+            "path": "/favorites",
+            "line": 435,
+            "is_admin": false
+          },
+          {
+            "method": "DELETE",
+            "path": "/favorites/:rewardId",
+            "line": 451,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/favorites",
+            "line": 467,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/history",
+            "line": 479,
+            "is_admin": false
+          },
+          {
+            "method": "POST",
+            "path": "/qr-scan",
+            "line": 495,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/partners",
+            "line": 507,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/partners/:partnerId/locations",
+            "line": 522,
+            "is_admin": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "social",
+      "files": [
+        "routes.ts"
+      ],
+      "routes_by_file": {}
+    },
+    {
+      "name": "users",
+      "files": [
+        "index.ts",
+        "routes.ts"
+      ],
+      "routes_by_file": {
+        "index.ts": [
+          {
+            "method": "GET",
+            "path": "/profile",
+            "line": 473,
+            "is_admin": false
+          },
+          {
+            "method": "PATCH",
+            "path": "/profile",
+            "line": 494,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/leaderboard",
+            "line": 522,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/stats",
+            "line": 541,
+            "is_admin": false
+          },
+          {
+            "method": "GET",
+            "path": "/admin/all",
+            "line": 564,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/admin/:userId/ban",
+            "line": 584,
+            "is_admin": true
+          },
+          {
+            "method": "POST",
+            "path": "/admin/:userId/unban",
+            "line": 622,
+            "is_admin": true
+          }
+        ]
+      }
+    }
+  ],
+  "duplicates": {
+    "GET /users": [
+      {
+        "module": "admin",
+        "file": "admin-extended.ts",
+        "line": 867,
+        "is_admin": true
+      },
+      {
+        "module": "admin",
+        "file": "index.ts",
+        "line": 159,
+        "is_admin": true
+      }
+    ],
+    "GET /prizes": [
+      {
+        "module": "admin",
+        "file": "admin-extended.ts",
+        "line": 912,
+        "is_admin": true
+      },
+      {
+        "module": "admin",
+        "file": "index.ts",
+        "line": 339,
+        "is_admin": true
+      }
+    ],
+    "POST /notifications/send": [
+      {
+        "module": "admin",
+        "file": "admin-extended.ts",
+        "line": 987,
+        "is_admin": true
+      },
+      {
+        "module": "admin",
+        "file": "index.ts",
+        "line": 449,
+        "is_admin": true
+      }
+    ],
+    "GET /rewards": [
+      {
+        "module": "admin",
+        "file": "admin-extended.ts",
+        "line": 1160,
+        "is_admin": true
+      },
+      {
+        "module": "admin",
+        "file": "index.ts",
+        "line": 487,
+        "is_admin": true
+      }
+    ],
+    "POST /rewards": [
+      {
+        "module": "admin",
+        "file": "admin-extended.ts",
+        "line": 1194,
+        "is_admin": true
+      },
+      {
+        "module": "admin",
+        "file": "index.ts",
+        "line": 532,
+        "is_admin": true
+      }
+    ],
+    "GET /achievements": [
+      {
+        "module": "admin",
+        "file": "admin-extended.ts",
+        "line": 1318,
+        "is_admin": true
+      },
+      {
+        "module": "auth",
+        "file": "auth-extended.ts",
+        "line": 607,
+        "is_admin": false
+      },
+      {
+        "module": "gamification",
+        "file": "index.ts",
+        "line": 125,
+        "is_admin": false
+      }
+    ],
+    "POST /achievements": [
+      {
+        "module": "admin",
+        "file": "admin-extended.ts",
+        "line": 1350,
+        "is_admin": true
+      },
+      {
+        "module": "gamification",
+        "file": "index.ts",
+        "line": 165,
+        "is_admin": true
+      }
+    ],
+    "GET /partners": [
+      {
+        "module": "admin",
+        "file": "admin-extended.ts",
+        "line": 1629,
+        "is_admin": true
+      },
+      {
+        "module": "rewards",
+        "file": "rewards-extended.ts",
+        "line": 507,
+        "is_admin": false
+      }
+    ],
+    "GET /settings": [
+      {
+        "module": "admin",
+        "file": "index.ts",
+        "line": 580,
+        "is_admin": true
+      },
+      {
+        "module": "notifications",
+        "file": "notifications-extended.ts",
+        "line": 455,
+        "is_admin": false
+      }
+    ],
+    "GET /": [
+      {
+        "module": "analytics",
+        "file": "index.ts",
+        "line": 122,
+        "is_admin": true
+      },
+      {
+        "module": "notifications",
+        "file": "index.ts",
+        "line": 145,
+        "is_admin": true
+      },
+      {
+        "module": "notifications",
+        "file": "notifications-extended.ts",
+        "line": 427,
+        "is_admin": false
+      },
+      {
+        "module": "partners",
+        "file": "index.ts",
+        "line": 86,
+        "is_admin": true
+      },
+      {
+        "module": "rewards",
+        "file": "index.ts",
+        "line": 491,
+        "is_admin": false
+      }
+    ],
+    "GET /stats": [
+      {
+        "module": "auth",
+        "file": "auth-extended.ts",
+        "line": 579,
+        "is_admin": false
+      },
+      {
+        "module": "notifications",
+        "file": "notifications-extended.ts",
+        "line": 509,
+        "is_admin": false
+      },
+      {
+        "module": "users",
+        "file": "index.ts",
+        "line": 541,
+        "is_admin": false
+      }
+    ],
+    "GET /profile": [
+      {
+        "module": "auth",
+        "file": "index.ts",
+        "line": 645,
+        "is_admin": false
+      },
+      {
+        "module": "users",
+        "file": "index.ts",
+        "line": 473,
+        "is_admin": false
+      }
+    ],
+    "PATCH /profile": [
+      {
+        "module": "auth",
+        "file": "index.ts",
+        "line": 664,
+        "is_admin": false
+      },
+      {
+        "module": "users",
+        "file": "index.ts",
+        "line": 494,
+        "is_admin": false
+      }
+    ],
+    "POST /": [
+      {
+        "module": "claims",
+        "file": "index.ts",
+        "line": 607,
+        "is_admin": false
+      },
+      {
+        "module": "notifications",
+        "file": "index.ts",
+        "line": 132,
+        "is_admin": true
+      },
+      {
+        "module": "partners",
+        "file": "index.ts",
+        "line": 73,
+        "is_admin": true
+      },
+      {
+        "module": "prizes",
+        "file": "index.ts",
+        "line": 636,
+        "is_admin": true
+      }
+    ],
+    "GET /admin/all": [
+      {
+        "module": "claims",
+        "file": "index.ts",
+        "line": 707,
+        "is_admin": true
+      },
+      {
+        "module": "users",
+        "file": "index.ts",
+        "line": 564,
+        "is_admin": true
+      }
+    ],
+    "GET /leaderboard": [
+      {
+        "module": "game",
+        "file": "index.ts",
+        "line": 602,
+        "is_admin": false
+      },
+      {
+        "module": "users",
+        "file": "index.ts",
+        "line": 522,
+        "is_admin": false
+      }
+    ],
+    "POST /sync": [
+      {
+        "module": "offline",
+        "file": "index.ts",
+        "line": 396,
+        "is_admin": false
+      },
+      {
+        "module": "offline",
+        "file": "routes-old-backup.ts",
+        "line": 675,
+        "is_admin": false
+      }
+    ],
+    "GET /search": [
+      {
+        "module": "prizes",
+        "file": "index.ts",
+        "line": 615,
+        "is_admin": false
+      },
+      {
+        "module": "rewards",
+        "file": "index.ts",
+        "line": 510,
+        "is_admin": false
+      }
+    ]
+  },
+  "admin_routes_outside_admin": [
+    {
+      "module": "analytics",
+      "file": "index.ts",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/",
+          "line": 122,
+          "is_admin": true
+        },
+        {
+          "method": "POST",
+          "path": "/generate",
+          "line": 140,
+          "is_admin": true
+        }
+      ]
+    },
+    {
+      "module": "claims",
+      "file": "index.ts",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/admin/all",
+          "line": 707,
+          "is_admin": true
+        }
+      ]
+    },
+    {
+      "module": "gamification",
+      "file": "index.ts",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/achievements/all",
+          "line": 153,
+          "is_admin": true
+        },
+        {
+          "method": "POST",
+          "path": "/achievements",
+          "line": 165,
+          "is_admin": true
+        },
+        {
+          "method": "PUT",
+          "path": "/achievements/:achievementId",
+          "line": 195,
+          "is_admin": true
+        },
+        {
+          "method": "DELETE",
+          "path": "/achievements/:achievementId",
+          "line": 209,
+          "is_admin": true
+        }
+      ]
+    },
+    {
+      "module": "notifications",
+      "file": "index.ts",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/",
+          "line": 132,
+          "is_admin": true
+        },
+        {
+          "method": "GET",
+          "path": "/",
+          "line": 145,
+          "is_admin": true
+        }
+      ]
+    },
+    {
+      "module": "partners",
+      "file": "index.ts",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/",
+          "line": 73,
+          "is_admin": true
+        },
+        {
+          "method": "GET",
+          "path": "/",
+          "line": 86,
+          "is_admin": true
+        }
+      ]
+    },
+    {
+      "module": "prizes",
+      "file": "index.ts",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/",
+          "line": 636,
+          "is_admin": true
+        },
+        {
+          "method": "PATCH",
+          "path": "/:prizeId",
+          "line": 661,
+          "is_admin": true
+        },
+        {
+          "method": "DELETE",
+          "path": "/:prizeId",
+          "line": 689,
+          "is_admin": true
+        },
+        {
+          "method": "POST",
+          "path": "/bulk",
+          "line": 715,
+          "is_admin": true
+        },
+        {
+          "method": "GET",
+          "path": "/stats/:city?",
+          "line": 738,
+          "is_admin": true
+        },
+        {
+          "method": "GET",
+          "path": "/heatmap/:city?",
+          "line": 759,
+          "is_admin": true
+        }
+      ]
+    },
+    {
+      "module": "rewards",
+      "file": "index.ts",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/admin",
+          "line": 615,
+          "is_admin": true
+        },
+        {
+          "method": "PATCH",
+          "path": "/admin/:rewardId",
+          "line": 638,
+          "is_admin": true
+        },
+        {
+          "method": "POST",
+          "path": "/admin/:rewardId/stock",
+          "line": 665,
+          "is_admin": true
+        },
+        {
+          "method": "GET",
+          "path": "/admin/stats",
+          "line": 692,
+          "is_admin": true
+        },
+        {
+          "method": "GET",
+          "path": "/admin/pending",
+          "line": 712,
+          "is_admin": true
+        }
+      ]
+    },
+    {
+      "module": "users",
+      "file": "index.ts",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/admin/all",
+          "line": 564,
+          "is_admin": true
+        },
+        {
+          "method": "POST",
+          "path": "/admin/:userId/ban",
+          "line": 584,
+          "is_admin": true
+        },
+        {
+          "method": "POST",
+          "path": "/admin/:userId/unban",
+          "line": 622,
+          "is_admin": true
+        }
+      ]
+    }
+  ],
+  "extended_files": [
+    "admin/admin-extended.ts",
+    "auth/auth-extended.ts",
+    "notifications/notifications-extended.ts",
+    "offline/routes-old-backup.ts",
+    "rewards/rewards-extended.ts"
+  ]
+}

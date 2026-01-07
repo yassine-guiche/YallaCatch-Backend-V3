@@ -1,0 +1,67 @@
+# Grafana datasource provisioning configuration
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+    jsonData:
+      timeInterval: 15s
+      queryTimeout: 60s
+      httpMethod: POST
+      manageAlerts: true
+      prometheusType: Prometheus
+      prometheusVersion: 2.47.0
+      cacheLevel: 'High'
+      incrementalQuerying: true
+      incrementalQueryOverlapWindow: 10m
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: loki
+          url: http://loki:3100
+    secureJsonData: {}
+
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    uid: loki
+    editable: true
+    jsonData:
+      maxLines: 1000
+      derivedFields:
+        - datasourceUid: prometheus
+          matcherRegex: "trace_id=(\\w+)"
+          name: TraceID
+          url: "$${__value.raw}"
+    secureJsonData: {}
+
+  - name: MongoDB
+    type: mongodb-datasource
+    access: proxy
+    url: mongodb://mongodb:27017
+    database: yallacatch
+    editable: true
+    jsonData:
+      authSource: admin
+      ssl: false
+    secureJsonData:
+      username: ${MONGO_ROOT_USERNAME}
+      password: ${MONGO_ROOT_PASSWORD}
+
+  - name: Redis
+    type: redis-datasource
+    access: proxy
+    url: redis://redis:6379
+    editable: true
+    jsonData:
+      client: standalone
+      poolSize: 5
+      timeout: 10
+      pingInterval: 0
+      pipelineWindow: 0
+    secureJsonData:
+      password: ${REDIS_PASSWORD}
