@@ -32,7 +32,7 @@ export default async function offlineRoutes(fastify: FastifyInstance) {
 
     const result = await OfflineService.syncActions(userId, data);
 
-    return reply.code(200).send(result);
+    return reply.code(200).send({ success: true, data: result });
   });
 
   // GET /api/offline/status - Get sync status
@@ -68,7 +68,7 @@ export default async function offlineRoutes(fastify: FastifyInstance) {
 
     const result = await OfflineService.getSyncStatus(userId, data);
 
-    return reply.code(200).send(result);
+    return reply.code(200).send({ success: true, data: result });
   });
 
   // POST /api/offline/retry - Retry failed actions
@@ -92,7 +92,7 @@ export default async function offlineRoutes(fastify: FastifyInstance) {
 
     const result = await OfflineService.retryFailedActions(userId);
 
-    return reply.code(200).send(result);
+    return reply.code(200).send({ success: true, data: result });
   });
 
   // POST /api/offline/package - Get offline data package
@@ -129,7 +129,44 @@ export default async function offlineRoutes(fastify: FastifyInstance) {
 
     const result = await OfflineService.getOfflineDataPackage(userId, body);
 
-    return reply.code(200).send(result);
+    return reply.code(200).send({ success: true, data: result });
+  });
+
+  // GET /api/offline/package - Get offline data package (Unity calls this as GET)
+  fastify.get('/package', {
+    preHandler: [authenticate],
+    schema: {
+      description: 'Get offline data package (GET variant for Unity)',
+      tags: ['Offline'],
+      querystring: {
+        type: 'object',
+        properties: {
+          latitude: { type: 'number' },
+          longitude: { type: 'number' },
+          radius: { type: 'number', default: 5 },
+          dataTypes: { type: 'string', default: 'prizes' },
+          maxItems: { type: 'number', default: 100 }
+        }
+      }
+    }
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const userId = request.user!.sub;
+    const query = request.query as any;
+
+    // Convert querystring to the shape the service expects
+    const packageOptions = {
+      location: query.latitude && query.longitude ? {
+        latitude: parseFloat(query.latitude),
+        longitude: parseFloat(query.longitude),
+        radius: parseFloat(query.radius || '5')
+      } : undefined,
+      dataTypes: query.dataTypes ? query.dataTypes.split(',') : ['prizes'],
+      maxItems: parseInt(query.maxItems || '100')
+    };
+
+    const result = await OfflineService.getOfflineDataPackage(userId, packageOptions);
+
+    return reply.code(200).send({ success: true, data: result });
   });
 
   // GET /api/offline/capabilities - Get offline capabilities
@@ -144,6 +181,6 @@ export default async function offlineRoutes(fastify: FastifyInstance) {
 
     const result = await OfflineService.getOfflineCapabilities(userId);
 
-    return reply.code(200).send(result);
+    return reply.code(200).send({ success: true, data: result });
   });
 }

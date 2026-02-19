@@ -509,7 +509,7 @@ export class GameService {
 
             // Award rewards
             await User.findByIdAndUpdate(userId, {
-                $inc: { points: challenge.reward }
+                $inc: { 'points.available': challenge.reward, 'points.total': challenge.reward }
             });
 
             // Update challenges in Redis

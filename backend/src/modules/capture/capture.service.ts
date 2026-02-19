@@ -8,8 +8,8 @@ import { validateAntiCheat as detectCheating } from '@/utils/anti-cheat';
 import { MetricsService, GameMetrics } from '@/services/metrics';
 import { z } from 'zod';
 import mongoose, { Types } from 'mongoose';
-
-import { PrizeType } from '@/types';
+import { broadcastAdminEvent } from '@/lib/websocket';
+import { PrizeContentType } from '@/types';
 
 // Validation Schemas
 export const CaptureAttemptSchema = z.object({
@@ -128,9 +128,10 @@ export class CaptureService {
         // Determine animation based on rarity/type
         let animationType = 'standard_box';
         const points = prize.points || prize.pointsReward?.amount || 0;
+        const prizeType = (prize as any).type as string; // Accessing type safely
 
         if (points > 5000) animationType = 'golden_box';
-        else if (prize.type === PrizeType.DIGITAL) animationType = 'digital_chest';
+        else if (prizeType === 'digital') animationType = 'digital_chest';
 
         return {
             animationId: animationType,
@@ -143,9 +144,14 @@ export class CaptureService {
 
     /**
      * Confirm Capture (Final Step)
-     * Creates the Claim, decrements quantity, awards points
+     * Creates the Claim, decrements quantity, awards points/rewards
      */
     static async confirmCapture(userId: string, prizeId: string) {
+        // Validate ID format first
+        if (!Types.ObjectId.isValid(prizeId)) {
+            throw new Error('Invalid prize ID format');
+        }
+
         const prize = await Prize.findById(prizeId);
         if (!prize) {
             throw new Error('Prize not found');
@@ -161,50 +167,202 @@ export class CaptureService {
                 throw new Error('Prize no longer available');
             }
 
-            // Decrement
+            // Decrement quantity
             currentPrize.quantity -= 1;
             await currentPrize.save({ session });
 
-            const points = currentPrize.points || currentPrize.pointsReward?.amount || 0;
-
-            // Create Claim
+            // Create basic Claim record first
             const claim = new Claim({
                 userId,
                 prizeId,
                 platform: 'mobile', // Default
                 status: 'active',
                 claimedAt: new Date(),
-                pointsAwarded: points
+                pointsAwarded: 0 // Will be updated below
             });
             await claim.save({ session });
 
-            // Add points to User
-            await User.findByIdAndUpdate(userId, {
-                $inc: { points: points, totalPoints: points }
-            }, { session });
+            // Process Prize Content Type (Points, Reward, Hybrid)
+            const user = await User.findById(userId).session(session);
+            if (!user) throw new Error('User not found');
 
+            let pointsAwarded = 0;
+            let redemptionId = null;
+            const contentType = currentPrize.contentType as string;
+
+            switch (contentType) {
+                case 'points': {
+                    // Points only
+                    const pointsAmount = currentPrize.pointsReward?.amount || currentPrize.points || 0;
+                    const bonusMultiplier = currentPrize.pointsReward?.bonusMultiplier || 1;
+                    pointsAwarded = Math.floor(pointsAmount * bonusMultiplier);
+                    user.points.available += pointsAwarded;
+                    user.points.total += pointsAwarded;
+                    break;
+                }
+
+                case PrizeContentType.REWARD: {
+                    // Direct Reward (Physical/Digital Item)
+                    if (currentPrize.directReward?.rewardId) {
+                        // Create Redemption record outside this transaction (safe helper handled below)
+                        // We mark it for creation after we secure the prize claim
+                        redemptionId = 'PENDING_CREATION';
+                    }
+                    pointsAwarded = 0;
+                    break;
+                }
+
+                case PrizeContentType.HYBRID: {
+                    // Points + Chance of Reward
+                    const guaranteedPoints = currentPrize.pointsReward?.amount || 0;
+                    user.points.available += guaranteedPoints;
+                    user.points.total += guaranteedPoints;
+                    pointsAwarded = guaranteedPoints;
+
+                    // Random roll for reward
+                    if (currentPrize.directReward?.rewardId) {
+                        const probability = currentPrize.directReward?.probability || 0.3;
+                        const roll = Math.random();
+
+                        if (roll <= probability) {
+                            redemptionId = 'PENDING_CREATION';
+                            typedLogger.info('Bonus reward won in hybrid capture!', { userId, prizeId, probability, roll });
+                        }
+                    }
+                    break;
+                }
+
+                default: {
+                    // Fallback to basic points if contentType is missing or unknown
+                    const defaultPoints = currentPrize.points || 0;
+                    user.points.available += defaultPoints;
+                    user.points.total += defaultPoints;
+                    pointsAwarded = defaultPoints;
+                }
+            }
+
+            // Update stats
+            user.stats.prizesFound += 1;
+            claim.pointsAwarded = pointsAwarded;
+
+            await user.save({ session });
+            await claim.save({ session });
             await session.commitTransaction();
 
-            // Metrics
+            // --- Post-Transaction Actions ---
+
+            // 1. Handle Redemption Creation (safe outside transaction to avoid cross-collection transaction complexity if not needed)
+            if (redemptionId === 'PENDING_CREATION' && currentPrize.directReward?.rewardId) {
+                try {
+                    const realRedemptionId = await this.createDirectRedemptionSafe(
+                        userId,
+                        currentPrize.directReward.rewardId.toString(),
+                        1
+                    );
+
+                    // Update claim with redemption ID
+                    await Claim.findByIdAndUpdate(claim._id, { $set: { redemptionId: realRedemptionId } });
+                    redemptionId = realRedemptionId;
+                } catch (err: any) {
+                    typedLogger.error('Failed to create redemption after capture', {
+                        userId,
+                        claimId: claim._id,
+                        error: err.message
+                    });
+                    // Don't fail the whole request, but log it. User got the prize claim but missed the reward item.
+                    // Ideally we should have a recovery mechanism here.
+                }
+            }
+
+            // 2. Metrics
             await MetricsService.recordMetric({
                 name: 'game.capture.success',
-                value: points,
+                value: pointsAwarded,
                 userId,
-                tags: { prizeId, points: points.toString() }
+                tags: { prizeId, points: pointsAwarded.toString() }
+            });
+
+            // 3. Achievements (Async)
+            const AchievementService = (await import('@/services/achievement')).default;
+            AchievementService.checkAchievements(userId, 'PRIZE_CLAIMED', {
+                prizeId,
+                category: currentPrize.category,
+                rarity: currentPrize.rarity,
+                pointsAwarded
+            }).catch(err => {
+                typedLogger.error('Check achievements error', { error: (err as any).message, userId, prizeId });
+            });
+
+            // 4. Broadcast Admin Event
+            broadcastAdminEvent({
+                type: 'capture_created',
+                data: {
+                    claimId: claim._id,
+                    userId,
+                    prize: {
+                        id: currentPrize._id,
+                        name: currentPrize.name,
+                        category: currentPrize.category,
+                        rarity: currentPrize.rarity
+                    },
+                    pointsAwarded,
+                    timestamp: new Date()
+                }
             });
 
             return {
                 success: true,
                 claimId: claim._id,
-                points: points,
-                prize: currentPrize
+                points: pointsAwarded,
+                prize: currentPrize,
+                redemptionId: redemptionId !== 'PENDING_CREATION' ? redemptionId : null
             };
 
         } catch (e) {
-            await session.abortTransaction();
+            if (session.inTransaction()) {
+                await session.abortTransaction();
+            }
             throw e;
         } finally {
             session.endSession();
         }
+    }
+
+    /**
+     * Helper to create a redemption record safely (similar to ClaimsService)
+     */
+    private static async createDirectRedemptionSafe(
+        userId: string,
+        rewardId: string,
+        quantity: number = 1
+    ): Promise<string> {
+        const Redemption = (await import('@/models/Redemption')).default;
+        const Reward = (await import('@/models/Reward')).default;
+        // Using any to avoid complicated circular dependency imports for types if strictly typed
+        // In a real scenario, we'd import the model interface
+
+        const reward = await Reward.findById(rewardId);
+        if (!reward) throw new Error('REWARD_NOT_FOUND');
+
+        // Reserve stock
+        const reserved = (reward as any).reserveStock ? (reward as any).reserveStock(quantity) : true;
+        if (!reserved) throw new Error('INSUFFICIENT_STOCK');
+
+        const idempotencyKey = `CAPTURE_REDEEM_${userId}_${rewardId}_${Date.now()}`;
+
+        const redemption = new Redemption({
+            userId: new Types.ObjectId(userId),
+            rewardId: new Types.ObjectId(rewardId),
+            quantity,
+            pointsSpent: 0,
+            status: 'PENDING',
+            idempotencyKey,
+            metadata: { source: 'AR_CAPTURE' },
+        });
+
+        await redemption.save();
+        await reward.save();
+
+        return redemption._id.toString();
     }
 }

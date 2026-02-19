@@ -254,6 +254,8 @@ export async function getPlayerHeatmap(params = {}) {
 }
 
 // ==================== MAINTENANCE MODE ====================
+// Note: These routes are registered in settings.routes.ts (mounted at admin root),
+// not in game-control.routes.ts. The /admin/maintenance/* paths are correct.
 
 /**
  * Start maintenance mode

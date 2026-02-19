@@ -42,13 +42,13 @@ export default async function arRoutes(fastify: FastifyInstance) {
         // Schema validation is now handled by the route schema
         const result = await ARService.startARView(userId, request.body);
 
-        return reply.code(200).send(result);
+        return reply.code(200).send({ success: true, data: result });
       } catch (error: unknown) {
         if (isErrorWithMessage(error) && error.message === 'PRIZE_NOT_FOUND') {
-          return reply.code(404).send({ error: 'PRIZE_NOT_FOUND', message: 'Prize not found' });
+          return reply.code(404).send({ success: false, error: 'PRIZE_NOT_FOUND', message: 'Prize not found' });
         }
         if (isErrorWithMessage(error) && error.message === 'PRIZE_NOT_AVAILABLE') {
-          return reply.code(400).send({ error: 'PRIZE_NOT_AVAILABLE', message: 'Prize is not available' });
+          return reply.code(400).send({ success: false, error: 'PRIZE_NOT_AVAILABLE', message: 'Prize is not available' });
         }
         throw error;
       }
@@ -80,13 +80,13 @@ export default async function arRoutes(fastify: FastifyInstance) {
 
         const result = await ARService.captureARScreenshot(userId, request.body);
 
-        return reply.code(200).send(result);
+        return reply.code(200).send({ success: true, data: result });
       } catch (error: unknown) {
         if (isErrorWithMessage(error) && error.message === 'AR_SESSION_NOT_FOUND') {
-          return reply.code(404).send({ error: 'AR_SESSION_NOT_FOUND', message: 'AR session not found' });
+          return reply.code(404).send({ success: false, error: 'AR_SESSION_NOT_FOUND', message: 'AR session not found' });
         }
         if (isErrorWithMessage(error) && error.message === 'AR_SESSION_NOT_ACTIVE') {
-          return reply.code(400).send({ error: 'AR_SESSION_NOT_ACTIVE', message: 'AR session is not active' });
+          return reply.code(400).send({ success: false, error: 'AR_SESSION_NOT_ACTIVE', message: 'AR session is not active' });
         }
         throw error;
       }
@@ -119,13 +119,13 @@ export default async function arRoutes(fastify: FastifyInstance) {
 
         const result = await ARService.endARSession(userId, request.body);
 
-        return reply.code(200).send(result);
+        return reply.code(200).send({ success: true, data: result });
       } catch (error: unknown) {
         if (isErrorWithMessage(error) && error.message === 'AR_SESSION_NOT_FOUND') {
-          return reply.code(404).send({ error: 'AR_SESSION_NOT_FOUND', message: 'AR session not found' });
+          return reply.code(404).send({ success: false, error: 'AR_SESSION_NOT_FOUND', message: 'AR session not found' });
         }
         if (isErrorWithMessage(error) && error.message === 'AR_SESSION_NOT_ACTIVE') {
-          return reply.code(400).send({ error: 'AR_SESSION_NOT_ACTIVE', message: 'AR session is not active' });
+          return reply.code(400).send({ success: false, error: 'AR_SESSION_NOT_ACTIVE', message: 'AR session is not active' });
         }
         throw error;
       }
@@ -174,10 +174,10 @@ export default async function arRoutes(fastify: FastifyInstance) {
 
         const result = await ARService.getARModel(prizeId);
 
-        return reply.code(200).send(result);
+        return reply.code(200).send({ success: true, data: result });
       } catch (error: unknown) {
         if (isErrorWithMessage(error) && error.message === 'PRIZE_NOT_FOUND') {
-          return reply.code(404).send({ error: 'PRIZE_NOT_FOUND', message: 'Prize not found' });
+          return reply.code(404).send({ success: false, error: 'PRIZE_NOT_FOUND', message: 'Prize not found' });
         }
         throw error;
       }

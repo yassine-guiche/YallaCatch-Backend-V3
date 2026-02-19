@@ -68,6 +68,7 @@ export default async function admobRoutes(fastify: FastifyInstance) {
       return reply.send({
         success: true,
         data: {
+          // Original data (consumed by admin panel)
           rewarded: {
             available: canWatchRewarded,
             remaining: Math.max(0, config.maxRewardedAdsPerDay - rewardedCount),
@@ -83,7 +84,25 @@ export default async function admobRoutes(fastify: FastifyInstance) {
           todayStats: {
             rewardedWatched: rewardedCount,
             interstitialWatched: interstitialCount
-          }
+          },
+          // Unity AdMobConfigResponse shape
+          rewardedAd: {
+            unitId: process.env.ADMOB_REWARDED_UNIT_ID || '',
+            enabled: canWatchRewarded,
+            cooldownSeconds: config.rewardedCooldown,
+          },
+          interstitialAd: {
+            unitId: process.env.ADMOB_INTERSTITIAL_UNIT_ID || '',
+            enabled: canWatchInterstitial,
+            cooldownSeconds: config.interstitialCooldown,
+          },
+          bannerAd: {
+            unitId: process.env.ADMOB_BANNER_UNIT_ID || '',
+            enabled: true,
+            cooldownSeconds: 0,
+          },
+          dailyRewardLimit: config.maxRewardedAdsPerDay,
+          rewardPerAd: config.rewardedVideoPoints,
         }
       });
     } catch (error) {
@@ -191,7 +210,7 @@ export default async function admobRoutes(fastify: FastifyInstance) {
       const user = await User.findByIdAndUpdate(
         userId,
         {
-          $inc: { points: rewardAmount },
+          $inc: { 'points.available': rewardAmount, 'points.total': rewardAmount },
           $push: {
             pointsHistory: {
               amount: rewardAmount,

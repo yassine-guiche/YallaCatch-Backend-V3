@@ -107,12 +107,24 @@ export default async function captureRoutes(fastify: FastifyInstance): Promise<v
     preHandler: [authenticate, claimsRateLimit],
     schema: {
       body: z.object({
-        claimId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid claim ID')
+        // Allow both for backwards compatibility, prioritize prizeId semantically
+        prizeId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid prize ID').optional(),
+        claimId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid ID').optional()
+      }).refine(data => data.prizeId || data.claimId, {
+        message: "Either prizeId or claimId must be provided"
       })
     }
-  }, async (request: FastifyRequest<{ Body: { claimId: string } }>, reply) => {
+  }, async (request: FastifyRequest<{ Body: { prizeId?: string; claimId?: string } }>, reply) => {
     try {
-      const result = await CaptureService.confirmCapture(request.user.sub, request.body.claimId);
+      // Map legacy claimId to prizeId if prizeId is missing
+      // In the context of "Confirm Capture", the client is sending the ID of the prize they just captured
+      const targetId = request.body.prizeId || request.body.claimId;
+
+      if (!targetId) {
+        throw new Error('Missing prize ID');
+      }
+
+      const result = await CaptureService.confirmCapture(request.user.sub, targetId);
       reply.send({ success: true, data: result });
     } catch (error) {
       reply.code(400).send({ success: false, error: (error as any).message });

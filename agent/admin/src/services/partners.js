@@ -200,6 +200,19 @@ export async function getPartnerLocationsAdmin(partnerId) {
 }
 
 /**
+ * Supprimer un emplacement d'un partenaire (admin)
+ */
+export async function deletePartnerLocation(partnerId, locationId) {
+  try {
+    await apiService.delete(`/admin/partners/${partnerId}/locations/${locationId}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Erreur deletePartnerLocation:', error);
+    throw error;
+  }
+}
+
+/**
  * Obtenir les analytics globales des partenaires
  * @param {Object} params - { period?: string }
  */
@@ -270,6 +283,7 @@ export default {
   resetPartnerCredentials,
   addPartnerLocation,
   updatePartnerLocation,
+  deletePartnerLocation,
   getPartnerLocationsAdmin,
   getPartnerOffers,
   getPartnerAnalytics,

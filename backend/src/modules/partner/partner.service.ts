@@ -164,13 +164,20 @@ export class PartnerService {
 
         if (!rewardIds.length) {
             return {
-                totals: { pending: 0, fulfilled: 0, cancelled: 0, total: 0 },
+                totals: { pending: 0, fulfilled: 0, cancelled: 0, total: 0, todayFulfilled: 0, thisWeekRedemptions: 0 },
                 byCategory: [],
                 recent: []
             };
         }
 
-        const [statusAgg, categoryAgg, recent] = await Promise.all([
+        // Date boundaries for analytics
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const weekStart = new Date();
+        weekStart.setDate(weekStart.getDate() - 7);
+        weekStart.setHours(0, 0, 0, 0);
+
+        const [statusAgg, categoryAgg, recent, todayAgg, weekAgg] = await Promise.all([
             Redemption.aggregate([
                 { $match: { rewardId: { $in: rewardIds } } },
                 { $group: { _id: '$status', count: { $sum: 1 } } }
@@ -186,13 +193,26 @@ export class PartnerService {
                 .populate('userId', 'displayName email')
                 .sort({ createdAt: -1 })
                 .limit(limitRecent)
-                .lean()
+                .lean(),
+            // Today's fulfilled redemptions
+            Redemption.countDocuments({
+                rewardId: { $in: rewardIds },
+                status: RedemptionStatus.FULFILLED,
+                updatedAt: { $gte: todayStart }
+            }),
+            // This week's total redemptions
+            Redemption.countDocuments({
+                rewardId: { $in: rewardIds },
+                createdAt: { $gte: weekStart }
+            }),
         ]);
 
         const totals: any = {
             pending: statusAgg.find(s => s._id === RedemptionStatus.PENDING)?.count || 0,
             fulfilled: statusAgg.find(s => s._id === RedemptionStatus.FULFILLED)?.count || 0,
             cancelled: statusAgg.find(s => s._id === RedemptionStatus.CANCELLED)?.count || 0,
+            todayFulfilled: todayAgg,
+            thisWeekRedemptions: weekAgg,
         };
         totals.total = totals.pending + totals.fulfilled + totals.cancelled;
 

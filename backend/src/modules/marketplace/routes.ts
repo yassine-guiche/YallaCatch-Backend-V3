@@ -123,6 +123,8 @@ export default async function marketplaceRoutes(fastify: FastifyInstance) {
     }
   }>, reply) => {
     try {
+      reply.header('Deprecation', 'true');
+      reply.header('Link', '</api/v1/rewards/scan>; rel="successor-version"');
       const result = await MarketplaceService.redeemItem(request.body);
       reply.send({ success: true, data: result });
     } catch (error) {

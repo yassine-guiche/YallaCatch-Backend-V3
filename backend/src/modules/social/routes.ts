@@ -225,4 +225,71 @@ export default async function socialRoutes(fastify: FastifyInstance) {
       reply.code(500).send({ success: false, error: (error as any).message });
     }
   });
+
+  // ── Missing routes (matched to Unity SocialAPI.cs) ──────────────────────
+
+  // GET /friends/requests/pending — Unity: SOCIAL_FRIENDS_PENDING
+  // Returns { incoming, outgoing } to match PendingRequestsResponse
+  fastify.get('/friends/requests/pending', {
+    preHandler: [authenticate]
+  }, async (request, reply) => {
+    try {
+      const userId = request.user.sub;
+      const [incoming, outgoing] = await Promise.all([
+        SocialService.getPendingRequests(userId),
+        SocialService.getSentRequests(userId),
+      ]);
+      reply.send({
+        success: true,
+        data: {
+          incoming: incoming.requests,
+          outgoing: outgoing.requests,
+        }
+      });
+    } catch (error) {
+      sendError(reply as FastifyReply, error, 'Get pending requests failed', 500);
+    }
+  });
+
+  // DELETE /friends/:id — Unity: SOCIAL_FRIEND_REMOVE
+  fastify.delete<{ Params: { id: string } }>('/friends/:id', {
+    preHandler: [authenticate],
+    schema: {
+      params: {
+        type: 'object',
+        required: ['id'],
+        properties: {
+          id: { type: 'string' }
+        }
+      }
+    }
+  }, async (request, reply) => {
+    try {
+      const result = await SocialService.removeFriend(request.user.sub, request.params.id);
+      reply.send({ success: true, data: result });
+    } catch (error) {
+      sendError(reply as FastifyReply, error, 'Remove friend failed');
+    }
+  });
+
+  // POST /friends/block — Block a user (future-proof)
+  fastify.post<{ Body: { friendshipId: string } }>('/friends/block', {
+    preHandler: [authenticate, userRateLimit],
+    schema: {
+      body: {
+        type: 'object',
+        required: ['friendshipId'],
+        properties: {
+          friendshipId: { type: 'string' }
+        }
+      }
+    }
+  }, async (request, reply) => {
+    try {
+      const result = await SocialService.blockUser(request.user.sub, request.body.friendshipId);
+      reply.send({ success: true, data: result });
+    } catch (error) {
+      sendError(reply as FastifyReply, error, 'Block user failed');
+    }
+  });
 }

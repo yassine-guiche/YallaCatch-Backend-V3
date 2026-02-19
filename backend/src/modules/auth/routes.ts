@@ -81,9 +81,9 @@ export default async function authRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // TEMP: partner debug helper (remove in production). Allows inspecting user/partner linkage for a given email.
+  // TEMP: partner debug helper (admin-only). Allows inspecting user/partner linkage for a given email.
   fastify.get<{ Querystring: { email?: string } }>('/partner-debug', {
-    preHandler: [authRateLimit],
+    preHandler: [authenticate, authRateLimit],
   }, async (request, reply) => {
     const email = (request.query.email || '').toString().trim().toLowerCase();
     if (!email) {

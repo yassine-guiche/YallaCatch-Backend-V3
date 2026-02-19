@@ -13,7 +13,7 @@ export default async function gameRoutes(fastify: FastifyInstance) {
     const data = GameSessionSchema.parse(request.body);
     const user = (request as any).user;
     const result = await GameService.startGameSession(user.sub, data as any);
-    return result;
+    return reply.send({ success: true, data: result });
   });
 
   // GAME_SESSION_END = "/game/session/end"
@@ -21,21 +21,21 @@ export default async function gameRoutes(fastify: FastifyInstance) {
     const user = (request as any).user;
     const { sessionId } = request.body as { sessionId: string };
     const result = await GameService.endGameSession(user.sub, sessionId);
-    return result;
+    return reply.send({ success: true, data: result });
   });
 
   // GAME_LOCATION = "/game/location" (Renamed from /location/update)
   fastify.post('/location', async (request, reply) => {
     const user = (request as any).user;
     const result = await GameService.updateLocation(user.sub, request.body as any);
-    return result;
+    return reply.send({ success: true, data: result });
   });
 
   // GAME_LEADERBOARD = "/game/leaderboard"
   fastify.get('/leaderboard', async (request, reply) => {
     const { type, limit } = request.query as { type?: string; limit?: number };
     const result = await GameService.getLeaderboard(type, limit);
-    return result;
+    return reply.send({ success: true, data: result });
   });
 
   // GAME_MAP = "/game/map"
@@ -51,12 +51,11 @@ export default async function gameRoutes(fastify: FastifyInstance) {
 
     // Validate bounds
     if (isNaN(bounds.north) || isNaN(bounds.south) || isNaN(bounds.east) || isNaN(bounds.west)) {
-      reply.code(400).send({ error: 'Invalid bounds' });
-      return reply;
+      return reply.code(400).send({ success: false, error: 'Invalid bounds' });
     }
 
     const result = await GameService.getMapData(bounds, user.sub);
-    return result;
+    return reply.send({ success: true, data: result });
   });
 
   // GAME_POWERUP_USE = "/game/powerup/use" (Singular 'powerup', was plural)
@@ -64,14 +63,14 @@ export default async function gameRoutes(fastify: FastifyInstance) {
     const user = (request as any).user;
     const data = PowerUpUsageSchema.parse(request.body);
     const result = await GameService.usePowerUp(user.sub, data as any);
-    return result;
+    return reply.send({ success: true, data: result });
   });
 
   // GAME_CHALLENGES = "/game/challenges" (Was /challenges/daily)
   fastify.get('/challenges', async (request, reply) => {
     const user = (request as any).user;
     const result = await GameService.getDailyChallenges(user.sub);
-    return result;
+    return reply.send({ success: true, data: result });
   });
 
   // GAME_CHALLENGE_COMPLETE = "/game/challenges/{0}/complete"
@@ -79,13 +78,13 @@ export default async function gameRoutes(fastify: FastifyInstance) {
     const user = (request as any).user;
     const { challengeId } = request.params as { challengeId: string };
     const result = await GameService.completeChallenge(user.sub, challengeId);
-    return result;
+    return reply.send({ success: true, data: result });
   });
 
   // GAME_INVENTORY = "/game/inventory"
   fastify.get('/inventory', async (request, reply) => {
     const user = (request as any).user;
     const result = await GameService.getInventory(user.sub);
-    return result;
+    return reply.send({ success: true, data: result });
   });
 }
