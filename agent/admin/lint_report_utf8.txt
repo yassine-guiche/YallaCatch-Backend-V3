@@ -1,0 +1,27 @@
+﻿
+> yallacatch-dashboard@2.0.0 lint
+> eslint . --report-unused-disable-directives --max-warnings 0
+
+
+C:\Users\MSI\Desktop\YALLACATCH VERSION 3.0\yallacatch-final-with-admob\yallacatch-clean\agent\admin\src\services\api.js
+  1119:16  error  'mockApiService' is not defined  no-undef
+  1125:16  error  'mockApiService' is not defined  no-undef
+  1128:16  error  'mockApiService' is not defined  no-undef
+  1134:16  error  'mockApiService' is not defined  no-undef
+  1137:16  error  'mockApiService' is not defined  no-undef
+  1143:16  error  'mockApiService' is not defined  no-undef
+  1146:16  error  'mockApiService' is not defined  no-undef
+  1152:16  error  'mockApiService' is not defined  no-undef
+  1156:16  error  'mockApiService' is not defined  no-undef
+  1161:16  error  'mockApiService' is not defined  no-undef
+  1165:16  error  'mockApiService' is not defined  no-undef
+  1169:16  error  'mockApiService' is not defined  no-undef
+  1172:16  error  'mockApiService' is not defined  no-undef
+  1175:16  error  'mockApiService' is not defined  no-undef
+  1179:16  error  'mockApiService' is not defined  no-undef
+  1184:16  error  'mockApiService' is not defined  no-undef
+  1187:16  error  'mockApiService' is not defined  no-undef
+  1192:16  error  'mockApiService' is not defined  no-undef
+
+Ô£û 18 problems (18 errors, 0 warnings)
+

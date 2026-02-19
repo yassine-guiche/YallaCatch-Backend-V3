@@ -1107,7 +1107,9 @@ class APIService {
 
   /**
    * Mock Request - Router les requêtes vers le mock API
+   * @deprecated Broken implementation, mockApiService missing methods.
    */
+  /*
   async mockRequest(endpoint, options = {}) {
     const method = options.method || 'GET';
     const body = options.body ? JSON.parse(options.body) : null;
@@ -1201,6 +1203,7 @@ class APIService {
       throw error;
     }
   }
+  */
 
   /**
    * Parser les query params d'une URL
