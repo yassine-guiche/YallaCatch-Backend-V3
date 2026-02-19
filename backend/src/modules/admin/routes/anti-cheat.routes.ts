@@ -5,7 +5,7 @@ import { AntiCheatMonitoringService } from '@/services/anti-cheat-monitoring';
 import { audit } from '@/lib/audit-logger';
 import { z } from 'zod';
 
-type AdminRequest<P = Record<string, any>, B = any, Q = any> = FastifyRequest<{
+type AdminRequest<P = Record<string, unknown>, B = unknown, Q = unknown> = FastifyRequest<{
   Params: P;
   Body: B;
   Querystring: Q;
@@ -19,7 +19,7 @@ export default async function antiCheatRoutes(fastify: FastifyInstance) {
   // Get all flagged claims with filters
   fastify.get('/flagged-claims', {
     preHandler: [authenticate, requireAdmin, adminRateLimit],
-  }, async (request: AdminRequest<{}, {}, {
+  }, async (request: AdminRequest<Record<string, never>, unknown, {
     userId?: string;
     riskLevel?: string;
     status?: string;
@@ -37,8 +37,8 @@ export default async function antiCheatRoutes(fastify: FastifyInstance) {
 
       const result = await AntiCheatMonitoringService.getFlaggedClaims(filters);
       reply.send({ success: true, data: result });
-    } catch (error: any) {
-      reply.code(500).send({ success: false, error: error.message });
+    } catch (error) {
+      reply.code(500).send({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -52,8 +52,8 @@ export default async function antiCheatRoutes(fastify: FastifyInstance) {
         return reply.code(404).send({ success: false, error: 'User not found' });
       }
       return reply.send({ success: true, data: profile });
-    } catch (error: any) {
-      return reply.code(500).send({ success: false, error: error.message });
+    } catch (error) {
+      return reply.code(500).send({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -64,8 +64,8 @@ export default async function antiCheatRoutes(fastify: FastifyInstance) {
     try {
       const metrics = await AntiCheatMonitoringService.getMetrics();
       reply.send({ success: true, data: metrics });
-    } catch (error: any) {
-      reply.code(500).send({ success: false, error: error.message });
+    } catch (error) {
+      reply.code(500).send({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -76,15 +76,15 @@ export default async function antiCheatRoutes(fastify: FastifyInstance) {
     try {
       const patterns = await AntiCheatMonitoringService.analyzeFraudPatterns();
       reply.send({ success: true, data: patterns });
-    } catch (error: any) {
-      reply.code(500).send({ success: false, error: error.message });
+    } catch (error) {
+      reply.code(500).send({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
   // Override claim decision (approve or reject)
   fastify.post('/override-claim', {
     preHandler: [authenticate, requireAdmin],
-  }, async (request: AdminRequest<{}, {
+  }, async (request: AdminRequest<Record<string, never>, {
     claimId: string;
     decision: 'approve' | 'reject';
     notes?: string;
@@ -135,8 +135,8 @@ export default async function antiCheatRoutes(fastify: FastifyInstance) {
         message: `Claim ${decision}d successfully`,
         data: result,
       });
-    } catch (error: any) {
-      return reply.code(500).send({ success: false, error: error.message });
+    } catch (error) {
+      return reply.code(500).send({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -154,15 +154,15 @@ export default async function antiCheatRoutes(fastify: FastifyInstance) {
       };
 
       reply.send({ success: true, data: settings });
-    } catch (error: any) {
-      reply.code(500).send({ success: false, error: error.message });
+    } catch (error) {
+      reply.code(500).send({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
   // Update risk score thresholds
   fastify.patch('/settings', {
     preHandler: [authenticate, requireAdmin],
-  }, async (request: AdminRequest<{}, {
+  }, async (request: AdminRequest<Record<string, never>, {
     riskThreshold?: number;
     criticalThreshold?: number;
     autoRejectAbove?: number;
@@ -193,18 +193,18 @@ export default async function antiCheatRoutes(fastify: FastifyInstance) {
         success: true,
         message: 'Settings updated successfully',
       });
-    } catch (error: any) {
-      return reply.code(500).send({ success: false, error: error.message });
+    } catch (error) {
+      return reply.code(500).send({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
   // Get recent anti-cheat alerts
   fastify.get('/recent-alerts', {
     preHandler: [authenticate, requireAdmin, adminRateLimit],
-  }, async (request: AdminRequest<{}, {}, { limit?: string }>, reply) => {
+  }, async (request: AdminRequest<Record<string, never>, unknown, { limit?: string }>, reply) => {
     try {
       const limit = request.query.limit ? parseInt(request.query.limit as string) : 20;
-      
+
       const result = await AntiCheatMonitoringService.getFlaggedClaims({
         riskLevel: 'critical',
         limit,
@@ -217,8 +217,8 @@ export default async function antiCheatRoutes(fastify: FastifyInstance) {
           count: result.total,
         },
       });
-    } catch (error: any) {
-      reply.code(500).send({ success: false, error: error.message });
+    } catch (error) {
+      reply.code(500).send({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -248,8 +248,8 @@ export default async function antiCheatRoutes(fastify: FastifyInstance) {
         .header('Content-Type', 'application/json')
         .header('Content-Disposition', 'attachment; filename="anti-cheat-report.json"')
         .send(report);
-    } catch (error: any) {
-      reply.code(500).send({ success: false, error: error.message });
+    } catch (error) {
+      reply.code(500).send({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 }

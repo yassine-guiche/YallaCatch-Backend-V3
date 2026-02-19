@@ -1,0 +1,81 @@
+﻿├░┼©┼íÔé¼ Starting YallaCatch Backend...
+├░┼©ÔÇ£ÔÇ╣ Environment: development
+├░┼©ÔÇØ┼Æ Port: 3000
+├░┼©┼Æ┬É Host: 0.0.0.0
+├░┼©ÔÇ£┬ª Connecting to MongoDB...
+├ó┼ôÔÇª MongoDB connected
+­ƒöî Connecting to Redis...
+[2026-02-18 01:05:19.868 +0100] [32mINFO[39m: [36myallacatch-backend[19220] MongoDB connected successfully[39m
+    host: "ac-2ncnl8l-shard-00-00.tt6an49.mongodb.net"
+    port: 27017
+    database: "yallacatch"
+    readyState: 1
+[2026-02-18 01:05:20.059 +0100] [32mINFO[39m: [36myallacatch-backend[19220] Redis connection established[39m
+[2026-02-18 01:05:20.336 +0100] [32mINFO[39m: [36myallacatch-backend[19220] Redis client ready[39m
+Ô£à Redis connected
+­ƒöº Initializing ConfigService...
+Ô£à ConfigService initialized
+­ƒôè Initializing MetricsService...
+Ô£à MetricsService initialized
+­ƒö¿ Creating database indexes...
+[2026-02-18 01:05:21.084 +0100] [32mINFO[39m: [36myallacatch-backend[19220] Redis connected successfully[39m
+    host: "redis-11469.c8.us-east-1-2.ec2.cloud.redislabs.com"
+    port: 11469
+    db: 0
+    status: "ready"
+[2026-02-18 01:05:21.086 +0100] [32mINFO[39m: [36myallacatch-backend[19220] Initializing ConfigService[39m
+[2026-02-18 01:05:21.338 +0100] [32mINFO[39m: [36myallacatch-backend[19220] Subscribed to config changes[39m
+    channels: 1
+[2026-02-18 01:05:21.339 +0100] [32mINFO[39m: [36myallacatch-backend[19220] ConfigService initialized[39m
+[2026-02-18 01:05:21.350 +0100] [32mINFO[39m: [36myallacatch-backend[19220] Metrics service initialized[39m
+Ô£à Database indexes created
+├░┼©ÔÇ£┬ª Creating Fastify server...
+npx : ├ó┬Ø┼Æ Failed to start 
+server: fastify-plugin: 
+@fastify/compress - expected 
+'5.x' fastify version, 
+'4.29.1' is installed
+Au caractère Ligne:1 : 1
++ npx tsx src/server.ts 2>&1 | 
+Out-File -FilePath 
+./startup-log.txt -En ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          :  
+   NotSpecified: (├ó┬Ø┼Æ Fail  
+  ed t...1' is installed:Str   
+ ing) [], RemoteException
+    + FullyQualifiedErrorId :  
+   NativeCommandError
+ 
+FastifyError: fastify-plugin: 
+@fastify/compress - expected 
+'5.x' fastify version, 
+'4.29.1' is installed
+    at Object.checkVersion (C:\
+Users\MSI\Desktop\YALLACATCH 
+VERSION 3.0\yallacatch-final-wi
+th-admob\yallacatch-clean\backe
+nd\node_modules\fastify\lib\plu
+ginUtils.js:125:11)
+    at Object.registerPlugin (C
+:\Users\MSI\Desktop\YALLACATCH 
+VERSION 3.0\yallacatch-final-wi
+th-admob\yallacatch-clean\backe
+nd\node_modules\fastify\lib\plu
+ginUtils.js:148:16)
+    at Boot.override (C:\Users\
+MSI\Desktop\YALLACATCH VERSION 
+3.0\yallacatch-final-with-admob
+\yallacatch-clean\backend\node_
+modules\fastify\lib\pluginOverr
+ide.js:28:57)
+    at Boot._loadPlugin (C:\Use
+rs\MSI\Desktop\YALLACATCH 
+VERSION 3.0\yallacatch-final-wi
+th-admob\yallacatch-clean\backe
+nd\node_modules\avvio\boot.js:4
+25:25)
+    at process.processTicksAndR
+ejections (node:internal/proces
+s/task_queues:82:21)
+[2026-02-18 01:05:24.170 +0100] [32mINFO[39m: [36myallacatch-backend[19220] Database indexes created successfully[39m

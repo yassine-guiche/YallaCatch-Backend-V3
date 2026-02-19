@@ -20,7 +20,15 @@ export interface IPartnerLocation {
   features?: string[]; // e.g., ['parking', 'wifi', 'accessibility']
 }
 
-export interface IPartner extends Document {
+export interface IPartnerMethods {
+  addLocation(locationData: Partial<IPartnerLocation>): Promise<IPartner>;
+  updateLocation(locationId: string | Types.ObjectId, updateData: Partial<IPartnerLocation>): Promise<IPartner>;
+  removeLocation(locationId: string | Types.ObjectId): Promise<IPartner>;
+  getLocationsByCity(city: string): IPartnerLocation[];
+  updateMetrics(redemptionValue: number, rating?: number): Promise<IPartner>;
+}
+
+export interface IPartner extends Document, IPartnerMethods {
   _id: Types.ObjectId;
   name: string;
   description: string;
@@ -28,9 +36,11 @@ export interface IPartner extends Document {
   website?: string;
   phone?: string;
   email?: string;
+  contactEmail?: string;
   categories: string[]; // e.g., ['food', 'shopping', 'entertainment']
   locations: IPartnerLocation[];
   isActive: boolean;
+  status: 'pending' | 'active' | 'inactive';
   contractStartDate?: Date;
   contractEndDate?: Date;
   commissionRate?: number; // Percentage
@@ -101,10 +111,10 @@ const PartnerLocationSchema = new Schema<IPartnerLocation>({
     type: [Number],
     required: true,
     validate: {
-      validator: function(coords: number[]) {
-        return coords.length === 2 && 
-               coords[0] >= -180 && coords[0] <= 180 && // longitude
-               coords[1] >= -90 && coords[1] <= 90;     // latitude
+      validator: function (coords: number[]) {
+        return coords.length === 2 &&
+          coords[0] >= -180 && coords[0] <= 180 && // longitude
+          coords[1] >= -90 && coords[1] <= 90;     // latitude
       },
       message: 'Coordinates must be [longitude, latitude] within valid ranges'
     }
@@ -149,7 +159,7 @@ const PartnerSchema = new Schema<IPartner>({
   website: {
     type: String,
     validate: {
-      validator: function(url: string) {
+      validator: function (url: string) {
         if (!url) return true;
         return /^https?:\/\/.+/.test(url);
       },
@@ -163,7 +173,7 @@ const PartnerSchema = new Schema<IPartner>({
   email: {
     type: String,
     validate: {
-      validator: function(email: string) {
+      validator: function (email: string) {
         if (!email) return true;
         return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
       },
@@ -179,6 +189,12 @@ const PartnerSchema = new Schema<IPartner>({
   isActive: {
     type: Boolean,
     default: true,
+    index: true,
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'active', 'inactive'],
+    default: 'active',
     index: true,
   },
   contractStartDate: {
@@ -208,7 +224,7 @@ const PartnerSchema = new Schema<IPartner>({
       type: String,
       required: false,
       validate: {
-        validator: function(email: string) {
+        validator: function (email: string) {
           if (!email) return true;
           return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
         },
@@ -311,23 +327,23 @@ PartnerSchema.index({ 'locations.coordinates': '2dsphere' });
 PartnerSchema.index({ createdAt: -1 });
 
 // Virtual for active locations count
-PartnerSchema.virtual('activeLocationsCount').get(function() {
+PartnerSchema.virtual('activeLocationsCount').get(function () {
   return this.locations.filter(location => location.isActive).length;
 });
 
 // Virtual for total locations count
-PartnerSchema.virtual('totalLocationsCount').get(function() {
+PartnerSchema.virtual('totalLocationsCount').get(function () {
   return this.locations.length;
 });
 
 // Method to add location
-PartnerSchema.methods.addLocation = function(locationData: Partial<IPartnerLocation>) {
+PartnerSchema.methods.addLocation = function (locationData: Partial<IPartnerLocation>) {
   this.locations.push(locationData);
   return this.save();
 };
 
 // Method to update location
-PartnerSchema.methods.updateLocation = function(locationId: string | Types.ObjectId, updateData: Partial<IPartnerLocation>) {
+PartnerSchema.methods.updateLocation = function (locationId: string | Types.ObjectId, updateData: Partial<IPartnerLocation>) {
   const location = this.locations.id(locationId);
   if (location) {
     Object.assign(location, updateData);
@@ -337,20 +353,20 @@ PartnerSchema.methods.updateLocation = function(locationId: string | Types.Objec
 };
 
 // Method to remove location
-PartnerSchema.methods.removeLocation = function(locationId: string | Types.ObjectId) {
+PartnerSchema.methods.removeLocation = function (locationId: string | Types.ObjectId) {
   this.locations.pull({ _id: locationId });
   return this.save();
 };
 
 // Method to get locations by city
-PartnerSchema.methods.getLocationsByCity = function(city: string) {
+PartnerSchema.methods.getLocationsByCity = function (city: string) {
   return this.locations.filter(location =>
     location.city.toLowerCase() === city.toLowerCase() && location.isActive
   );
 };
 
 // Method to get nearby locations
-PartnerSchema.statics.findNearbyPartners = function(longitude: number, latitude: number, maxDistance: number = 5000) {
+PartnerSchema.statics.findNearbyPartners = function (longitude: number, latitude: number, maxDistance: number = 5000) {
   return this.find({
     isActive: true,
     'locations.coordinates': {
@@ -366,22 +382,22 @@ PartnerSchema.statics.findNearbyPartners = function(longitude: number, latitude:
 };
 
 // Method to update metrics
-PartnerSchema.methods.updateMetrics = function(redemptionValue: number, rating?: number) {
+PartnerSchema.methods.updateMetrics = function (redemptionValue: number, rating?: number) {
   this.metrics.totalRedemptions += 1;
   this.metrics.totalRevenue += redemptionValue;
   this.metrics.lastActivityAt = new Date();
-  
+
   if (rating) {
     // Calculate new average rating
     const currentTotal = this.metrics.averageRating * (this.metrics.totalRedemptions - 1);
     this.metrics.averageRating = (currentTotal + rating) / this.metrics.totalRedemptions;
   }
-  
+
   return this.save();
 };
 
 // Static method to get partners by category
-PartnerSchema.statics.findByCategory = function(category: string) {
+PartnerSchema.statics.findByCategory = function (category: string) {
   return this.find({
     categories: category,
     isActive: true
@@ -389,7 +405,7 @@ PartnerSchema.statics.findByCategory = function(category: string) {
 };
 
 // Static method to get partners statistics
-PartnerSchema.statics.getStatistics = function() {
+PartnerSchema.statics.getStatistics = function () {
   return this.aggregate([
     {
       $group: {
@@ -416,11 +432,18 @@ PartnerSchema.statics.getStatistics = function() {
 };
 
 // Pre-save middleware to update timestamps
-PartnerSchema.pre('save', function(next) {
+PartnerSchema.pre('save', function (next) {
   if (this.isModified() && !this.isNew) {
     this.updatedAt = new Date();
   }
   next();
 });
 
-export const Partner = (mongoose.models.Partner as mongoose.Model<IPartner>) || mongoose.model<IPartner>('Partner', PartnerSchema);
+// Define Static Methods Interface
+export interface IPartnerModel extends mongoose.Model<IPartner> {
+  findNearbyPartners(longitude: number, latitude: number, maxDistance?: number): mongoose.Query<IPartner[], IPartner>;
+  findByCategory(category: string): mongoose.Query<IPartner[], IPartner>;
+  getStatistics(): mongoose.Aggregate<any[]>;
+}
+
+export const Partner = (mongoose.models.Partner as IPartnerModel) || mongoose.model<IPartner, IPartnerModel>('Partner', PartnerSchema);

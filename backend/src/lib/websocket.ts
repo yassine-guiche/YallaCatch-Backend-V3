@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import fastifyWebsocket from '@fastify/websocket';
 import { typedLogger } from '@/lib/typed-logger';
-import { authenticate } from '@/middleware/auth';
+import { verifyToken } from '@/lib/jwt';
 
 // Socket.IO instance reference (set from server.ts)
 let socketIO: any = null;
@@ -167,20 +167,28 @@ export async function setupWebSocket(fastify: FastifyInstance) {
       }
 
       // Decode token to get user info
-      // In production, verify JWT properly
       let userId = 'unknown';
       let isAdmin = false;
 
       try {
-        // Parse token (simplified - use proper JWT verification in production)
-        const parts = token.split('.');
-        if (parts.length === 3) {
-          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
-          userId = payload.sub || payload.userId || 'unknown';
-          isAdmin = payload.role === 'admin' || payload.permissions?.includes('*');
+        const verificationResult = await verifyToken(token);
+        if (verificationResult.valid && verificationResult.decoded) {
+          const payload = verificationResult.decoded;
+          userId = payload.sub || 'unknown';
+          isAdmin = ['admin', 'super_admin', 'moderator'].includes(payload.role);
+        } else {
+          socket.write(JSON.stringify({
+            type: 'error',
+            message: verificationResult.error || 'Invalid or expired token'
+          }));
+          socket.end();
+          return;
         }
       } catch (e) {
-        typedLogger.warn('Failed to parse WebSocket token');
+        typedLogger.warn('WebSocket authentication failed', { error: (e as any).message });
+        socket.write(JSON.stringify({ type: 'error', message: 'Authentication error' }));
+        socket.end();
+        return;
       }
 
       const clientId = `${userId}-${Date.now()}-${Math.random()}`;
@@ -247,18 +255,20 @@ function handleWebSocketMessage(client: WebSocketClient, message: any) {
       client.ws.write(JSON.stringify({ type: 'unsubscribed', room }));
       break;
 
-    case 'get-history':
+    case 'get-history': {
       const limit = data?.limit || 50;
       const history = wsManager.getEventHistory(limit);
       client.ws.write(JSON.stringify({ type: 'history', data: history }));
       break;
+    }
 
-    case 'get-stats':
+    case 'get-stats': {
       if (client.isAdmin) {
         const stats = wsManager.getStats();
         client.ws.write(JSON.stringify({ type: 'stats', data: stats }));
       }
       break;
+    }
 
     case 'ping':
       client.ws.write(JSON.stringify({ type: 'pong', timestamp: new Date().toISOString() }));
@@ -277,7 +287,7 @@ export function broadcastGameEvent(event: any) {
   };
   wsManager.queueEvent(event);
   wsManager.broadcastToRoom('game-events', message);
-  
+
   // Also emit to Socket.IO if available
   if (socketIO) {
     socketIO.to('game').emit('game_event', event);
@@ -292,28 +302,28 @@ export function broadcastAdminEvent(event: any) {
   };
   wsManager.queueEvent(event);
   wsManager.broadcastToAdmins(message);
-  
+
   // Also emit to Socket.IO rooms
   if (socketIO) {
     const eventType = event.type || 'admin_update';
-    
+
     // Send to all admin rooms
     socketIO.to('admin').emit(eventType, event);
     socketIO.to('dashboard').emit(eventType, event);
     socketIO.to('dashboard').emit('stats_update', { stats: event.stats || event });
-    
+
     // Send marketplace events to marketplace room
     if (eventType.includes('marketplace')) {
       socketIO.to('marketplace').emit(eventType, event);
       socketIO.to('rewards').emit(eventType, event);
     }
-    
+
     // Send reward events to rewards room
     if (eventType.includes('reward') || eventType.includes('redemption')) {
       socketIO.to('rewards').emit(eventType, event);
       socketIO.to('marketplace').emit(eventType, event);
     }
-    
+
     typedLogger.debug('Socket.IO admin event emitted', { eventType, rooms: ['admin', 'dashboard', 'marketplace', 'rewards'] });
   }
 }

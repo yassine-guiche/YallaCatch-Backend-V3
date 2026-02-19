@@ -201,6 +201,32 @@ const prizeSchema = new Schema<IPrize>({
       message: 'Invalid image URL format'
     }
   },
+  arModel: {
+    modelUrl: {
+      type: String,
+    },
+    textureUrl: {
+      type: String,
+    },
+    scale: {
+      type: Number,
+      default: 1,
+    },
+    rotation: {
+      x: {
+        type: Number,
+        default: 0,
+      },
+      y: {
+        type: Number,
+        default: 0,
+      },
+      z: {
+        type: Number,
+        default: 0,
+      },
+    },
+  },
   value: {
     type: Number,
     min: 0,

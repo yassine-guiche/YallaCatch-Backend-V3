@@ -154,7 +154,7 @@ export interface ISettings extends Document {
   _id: Types.ObjectId;
   version: string;
   environment: 'development' | 'staging' | 'production';
-  
+
   game: IGameSettings;
   rewards: IRewardSettings;
   notifications: INotificationSettings;
@@ -162,7 +162,7 @@ export interface ISettings extends Document {
   business: IBusinessSettings;
   integrations: IIntegrationSettings;
   maintenance: IMaintenanceSettings;
-  
+
   // Feature flags
   features: {
     [featureName: string]: {
@@ -172,12 +172,12 @@ export interface ISettings extends Document {
       allowedRoles?: string[];
     };
   };
-  
+
   // Custom settings
   custom: {
     [key: string]: any;
   };
-  
+
   createdAt: Date;
   updatedAt: Date;
   createdBy?: string;
@@ -675,49 +675,49 @@ SettingsSchema.index({ version: 1 });
 SettingsSchema.index({ environment: 1 }, { unique: true });
 
 // Virtual for checking if maintenance mode is active
-SettingsSchema.virtual('isMaintenanceActive').get(function() {
+SettingsSchema.virtual('isMaintenanceActive').get(function () {
   if (this.maintenance.maintenanceMode) return true;
-  
+
   if (this.maintenance.scheduledMaintenance) {
     const now = new Date();
-    return now >= this.maintenance.scheduledMaintenance.startTime && 
-           now <= this.maintenance.scheduledMaintenance.endTime;
+    return now >= this.maintenance.scheduledMaintenance.startTime &&
+      now <= this.maintenance.scheduledMaintenance.endTime;
   }
-  
+
   return false;
 });
 
 // Method to check if feature is enabled for user
-SettingsSchema.methods.isFeatureEnabled = function(featureName: string, userId?: string, userRole?: string): boolean {
+SettingsSchema.methods.isFeatureEnabled = function (featureName: string, userId?: string, userRole?: string): boolean {
   const feature = this.features.get(featureName);
   if (!feature) return false;
-  
+
   if (!feature.enabled) return false;
-  
+
   // Check user-specific access
   if (feature.allowedUsers && feature.allowedUsers.length > 0) {
     return userId && feature.allowedUsers.includes(userId);
   }
-  
+
   // Check role-specific access
   if (feature.allowedRoles && feature.allowedRoles.length > 0) {
     return userRole && feature.allowedRoles.includes(userRole);
   }
-  
+
   // Check rollout percentage
   if (feature.rolloutPercentage < 100) {
     if (!userId) return false;
-    
+
     // Use user ID to determine if they're in the rollout
     const hash = this.hashUserId(userId);
     return hash < feature.rolloutPercentage;
   }
-  
+
   return true;
 };
 
 // Helper method to hash user ID for rollout percentage
-SettingsSchema.methods.hashUserId = function(userId: string): number {
+SettingsSchema.methods.hashUserId = function (userId: string): number {
   let hash = 0;
   for (let i = 0; i < userId.length; i++) {
     const char = userId.charCodeAt(i);
@@ -728,10 +728,10 @@ SettingsSchema.methods.hashUserId = function(userId: string): number {
 };
 
 // Method to get setting by path
-SettingsSchema.methods.getSetting = function(path: string): any {
+SettingsSchema.methods.getSetting = function (path: string): any {
   const keys = path.split('.');
   let current = this.toObject();
-  
+
   for (const key of keys) {
     if (current && typeof current === 'object' && key in current) {
       current = current[key];
@@ -739,15 +739,15 @@ SettingsSchema.methods.getSetting = function(path: string): any {
       return undefined;
     }
   }
-  
+
   return current;
 };
 
 // Method to set setting by path
-SettingsSchema.methods.setSetting = function(path: string, value: any): void {
+SettingsSchema.methods.setSetting = function (path: string, value: any): void {
   const keys = path.split('.');
   let current = this;
-  
+
   for (let i = 0; i < keys.length - 1; i++) {
     const key = keys[i];
     if (!current[key]) {
@@ -755,17 +755,17 @@ SettingsSchema.methods.setSetting = function(path: string, value: any): void {
     }
     current = current[key];
   }
-  
+
   current[keys[keys.length - 1]] = value;
 };
 
 // Static method to get current settings for environment
-SettingsSchema.statics.getCurrentSettings = function(environment: string = 'production') {
+SettingsSchema.statics.getCurrentSettings = function (environment: string = 'production') {
   return this.findOne({ environment }).exec();
 };
 
 // Static method to initialize default settings
-SettingsSchema.statics.initializeDefaults = function(environment: string = 'production') {
+SettingsSchema.statics.initializeDefaults = function (environment: string = 'production') {
   return this.findOneAndUpdate(
     { environment },
     { environment },
@@ -774,17 +774,17 @@ SettingsSchema.statics.initializeDefaults = function(environment: string = 'prod
 };
 
 // Pre-save middleware to validate settings
-SettingsSchema.pre('save', function(next) {
+SettingsSchema.pre('save', function (next) {
   // Validate game settings
   if (this.game.maxSpeedMs > 100) {
     return next(new Error('Max speed cannot exceed 100 m/s'));
   }
-  
+
   // Validate security settings
   if (this.security.jwt.accessTokenExpirationMs > this.security.jwt.refreshTokenExpirationMs) {
     return next(new Error('Access token expiration cannot exceed refresh token expiration'));
   }
-  
+
   // Validate business hours
   const businessHours = this.business.businessHours;
   for (const [day, hours] of Object.entries(businessHours)) {
@@ -792,7 +792,7 @@ SettingsSchema.pre('save', function(next) {
       return next(new Error(`Business hours for ${day} are incomplete`));
     }
   }
-  
+
   next();
 });
 

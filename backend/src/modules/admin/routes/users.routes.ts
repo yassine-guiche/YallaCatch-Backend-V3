@@ -1,9 +1,18 @@
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import { authenticate, requireAdmin } from '@/middleware/auth';
 import { adminRateLimit } from '@/middleware/distributed-rate-limit';
-import { AdminUsersService } from '../services/admin-users.service';
+import { AdminUsersService, BanData } from '../services/admin-users.service';
 import { AuditLog } from '@/models/AuditLog';
 import { z } from 'zod';
+import { FilterQuery } from 'mongoose';
+import { IAuditLogDocument } from '@/types';
+import { PointsHistoryService } from '@/services/points-history';
+
+const PointsHistoryQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  filter: z.enum(['all', 'credit', 'debit', 'achievement', 'claim']).default('all'),
+});
 
 const UserManagementSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -36,7 +45,7 @@ export default async function usersRoutes(fastify: FastifyInstance) {
   fastify.addHook('preHandler', requireAdmin);
   fastify.addHook('preHandler', adminRateLimit);
 
-  fastify.get('/users', async (request: FastifyRequest, reply) => {
+  fastify.get<{ Querystring: z.infer<typeof UserManagementSchema> }>('/users', async (request, reply) => {
     const query = UserManagementSchema.parse(request.query);
     const result = await AdminUsersService.getUsers(query);
     return reply.send(result);
@@ -51,10 +60,11 @@ export default async function usersRoutes(fastify: FastifyInstance) {
     return reply.send({ user });
   });
 
-  fastify.patch('/users/:userId', async (request: FastifyRequest<{ Params: { userId: string } }>, reply) => {
+  fastify.patch<{ Params: { userId: string }; Body: z.infer<typeof UpdateUserSchema> }>('/users/:userId', async (request, reply) => {
     const { userId } = request.params;
     const updates = UpdateUserSchema.parse(request.body);
-    const adminId = (request as any).user?.id || (request as any).userId;
+    const adminId = request.user?.sub;
+    if (!adminId) return reply.status(401).send({ error: 'Unauthorized' });
     const user = await AdminUsersService.updateUserProfile(userId, updates, adminId);
     if (!user) {
       return reply.status(404).send({ error: 'User not found' });
@@ -62,10 +72,11 @@ export default async function usersRoutes(fastify: FastifyInstance) {
     return reply.send(user);
   });
 
-  fastify.post('/users/:userId/ban', async (request: FastifyRequest<{ Params: { userId: string } }>, reply) => {
+  fastify.post<{ Params: { userId: string }; Body: z.infer<typeof BanUserSchema> }>('/users/:userId/ban', async (request, reply) => {
     const { userId } = request.params;
-    const banData = BanUserSchema.parse(request.body) as any;
-    const adminId = (request as any).user?.id || (request as any).userId;
+    const banData = BanUserSchema.parse(request.body) as BanData;
+    const adminId = request.user?.sub;
+    if (!adminId) return reply.status(401).send({ error: 'Unauthorized' });
     const result = await AdminUsersService.banUser(userId, banData, adminId);
     if (!result) {
       return reply.status(404).send({ error: 'User not found' });
@@ -74,7 +85,8 @@ export default async function usersRoutes(fastify: FastifyInstance) {
   });
   fastify.post('/users/:userId/unban', async (request: FastifyRequest<{ Params: { userId: string } }>, reply) => {
     const { userId } = request.params;
-    const adminId = (request as any).user?.id || (request as any).userId;
+    const adminId = request.user?.sub;
+    if (!adminId) return reply.status(401).send({ error: 'Unauthorized' });
     const result = await AdminUsersService.unbanUser(userId, adminId);
     if (!result) {
       return reply.status(404).send({ error: 'User not found' });
@@ -82,10 +94,11 @@ export default async function usersRoutes(fastify: FastifyInstance) {
     return reply.send({ success: true, message: 'User unbanned successfully' });
   });
 
-  fastify.post('/users/:userId/points', async (request: FastifyRequest<{ Params: { userId: string } }>, reply) => {
+  fastify.post<{ Params: { userId: string }; Body: z.infer<typeof AdjustPointsSchema> }>('/users/:userId/points', async (request, reply) => {
     const { userId } = request.params;
     const pointsData = AdjustPointsSchema.parse(request.body);
-    const adminId = (request as any).user?.id || (request as any).userId;
+    const adminId = request.user?.sub;
+    if (!adminId) return reply.status(401).send({ error: 'Unauthorized' });
     const result = await AdminUsersService.adjustPoints(userId, pointsData.amount, pointsData.reason, adminId);
     if (!result) {
       return reply.status(404).send({ error: 'User not found' });
@@ -93,9 +106,30 @@ export default async function usersRoutes(fastify: FastifyInstance) {
     return reply.send(result);
   });
 
+  // GET /users/:userId/points/history - Get points transaction history for a user
+  fastify.get<{ Params: { userId: string }; Querystring: z.infer<typeof PointsHistoryQuerySchema> }>('/users/:userId/points/history', async (request, reply) => {
+    const { userId } = request.params;
+    const query = PointsHistoryQuerySchema.parse(request.query);
+    try {
+      const result = await PointsHistoryService.getUserHistory(userId, {
+        page: query.page,
+        limit: query.limit,
+        filter: query.filter,
+      });
+      return reply.send({
+        success: true,
+        data: result.items,
+        pagination: result.pagination,
+      });
+    } catch (error) {
+      return reply.status(500).send({ error: 'Failed to fetch points history' });
+    }
+  });
+
   fastify.delete('/users/:userId', async (request: FastifyRequest<{ Params: { userId: string } }>, reply) => {
     const { userId } = request.params;
-    const adminId = (request as any).user?.id || (request as any).userId;
+    const adminId = request.user?.sub;
+    if (!adminId) return reply.status(401).send({ error: 'Unauthorized' });
     const result = await AdminUsersService.deleteUser(userId, adminId);
     if (!result) {
       return reply.status(404).send({ error: 'User not found' });
@@ -117,7 +151,7 @@ export default async function usersRoutes(fastify: FastifyInstance) {
 
     try {
       // Build query based on type filter
-      let query: any;
+      let query: FilterQuery<IAuditLogDocument> = {};
       if (type === 'actor') {
         // Only logs where user performed the action
         query = { userId };
@@ -155,7 +189,7 @@ export default async function usersRoutes(fastify: FastifyInstance) {
       ]);
 
       // Enhance logs with role indicator (actor vs target)
-      const enhancedLogs = logs.map((log: any) => ({
+      const enhancedLogs = logs.map((log) => ({
         ...log,
         role: log.userId === userId ? 'actor' : 'target',
         displayAction: formatAction(log.action),

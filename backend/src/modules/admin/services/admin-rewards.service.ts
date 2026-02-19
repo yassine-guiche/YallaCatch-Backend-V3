@@ -1,6 +1,7 @@
 import { Reward } from '@/models/Reward';
 import { audit } from '@/lib/audit-logger';
 import { Types } from 'mongoose';
+import { ListingType } from '@/types';
 import { typedLogger } from '@/lib/typed-logger';
 
 export interface RewardQueryOptions {
@@ -11,6 +12,7 @@ export interface RewardQueryOptions {
   minCost?: number;
   maxCost?: number;
   search?: string;
+  listingType?: ListingType;
 }
 
 export class AdminRewardsService {
@@ -23,7 +25,7 @@ export class AdminRewardsService {
       const limit = Math.min(100, Math.max(1, parseInt(String(query.limit)) || 50));
       const skip = (page - 1) * limit;
 
-      const filterQuery: any = {};
+      const filterQuery: Record<string, unknown> = {};
 
       if (query.category) filterQuery.category = query.category;
       if (query.status && query.status !== 'all') {
@@ -31,13 +33,21 @@ export class AdminRewardsService {
       }
       if (query.minCost) filterQuery.pointsCost = { $gte: parseInt(String(query.minCost)) };
       if (query.maxCost) {
-        filterQuery.pointsCost = { ...filterQuery.pointsCost, $lte: parseInt(String(query.maxCost)) };
+        const existingPointsCost = filterQuery.pointsCost as Record<string, number> || {};
+        filterQuery.pointsCost = { ...existingPointsCost, $lte: parseInt(String(query.maxCost)) };
       }
       if (query.search) {
         filterQuery.$or = [
           { name: { $regex: query.search, $options: 'i' } },
           { description: { $regex: query.search, $options: 'i' } },
         ];
+      }
+
+      // Filter by listingType if provided, otherwise default to GAME_REWARD for backward compatibility
+      // unless specifically asked for 'all' (if we wanted that, but for now we enforce separation)
+      // Actually, if listingType is provided, use it.
+      if (query.listingType) {
+        filterQuery.listingType = query.listingType;
       }
 
       const [rewards, total] = await Promise.all([
@@ -62,7 +72,7 @@ export class AdminRewardsService {
         total,
       };
     } catch (error) {
-      typedLogger.error('Admin get rewards error', { error: (error as any).message, query });
+      typedLogger.error('Admin get rewards error', { error: error instanceof Error ? error.message : 'Unknown', query });
       throw error;
     }
   }
@@ -83,7 +93,7 @@ export class AdminRewardsService {
       }
       return reward.toJSON();
     } catch (error) {
-      typedLogger.error('Admin get reward error', { error: (error as any).message, rewardId });
+      typedLogger.error('Admin get reward error', { error: error instanceof Error ? error.message : 'Unknown', rewardId });
       throw error;
     }
   }
@@ -91,7 +101,7 @@ export class AdminRewardsService {
   /**
    * Create a new reward
    */
-  static async createReward(adminId: string, data: any) {
+  static async createReward(adminId: string, data: Record<string, unknown>) {
     try {
       const { name, description, category, pointsCost, stockQuantity, ...rest } = data;
 
@@ -100,6 +110,7 @@ export class AdminRewardsService {
         description,
         category,
         pointsCost,
+        listingType: data.listingType || ListingType.GAME_REWARD,
         stockQuantity,
         stockAvailable: stockQuantity,
         stockReserved: 0,
@@ -118,7 +129,7 @@ export class AdminRewardsService {
 
       return reward.toJSON();
     } catch (error) {
-      typedLogger.error('Admin create reward error', { error: (error as any).message, adminId, data });
+      typedLogger.error('Admin create reward error', { error: error instanceof Error ? error.message : 'Unknown', adminId, data });
       throw error;
     }
   }
@@ -126,7 +137,7 @@ export class AdminRewardsService {
   /**
    * Update an existing reward
    */
-  static async updateReward(adminId: string, rewardId: string, data: any) {
+  static async updateReward(adminId: string, rewardId: string, data: Record<string, unknown>) {
     try {
       // Validate ObjectId
       if (!Types.ObjectId.isValid(rewardId)) {
@@ -134,9 +145,9 @@ export class AdminRewardsService {
       }
 
       // Build update object with allowed fields only
-      const allowedFields = ['name', 'description', 'category', 'pointsCost', 'imageUrl', 'isActive', 'isPopular'];
-      const updateData: any = {};
-      
+      const allowedFields = ['name', 'description', 'category', 'pointsCost', 'imageUrl', 'isActive', 'isPopular', 'listingType'];
+      const updateData: Record<string, unknown> = {};
+
       Object.keys(data).forEach(key => {
         if (allowedFields.includes(key) && data[key] !== undefined) {
           updateData[key] = data[key];
@@ -174,7 +185,7 @@ export class AdminRewardsService {
 
       return reward.toJSON();
     } catch (error) {
-      typedLogger.error('Admin update reward error', { error: (error as any).message, adminId, rewardId, data });
+      typedLogger.error('Admin update reward error', { error: error instanceof Error ? error.message : 'Unknown', adminId, rewardId, data });
       throw error;
     }
   }
@@ -205,7 +216,7 @@ export class AdminRewardsService {
 
       return { success: true, deletedId: rewardId };
     } catch (error) {
-      typedLogger.error('Admin delete reward error', { error: (error as any).message, adminId, rewardId });
+      typedLogger.error('Admin delete reward error', { error: error instanceof Error ? error.message : 'Unknown', adminId, rewardId });
       throw error;
     }
   }
@@ -237,7 +248,7 @@ export class AdminRewardsService {
 
       return reward.toJSON();
     } catch (error) {
-      typedLogger.error('Admin update reward stock error', { error: (error as any).message, adminId, rewardId, quantity });
+      typedLogger.error('Admin update reward stock error', { error: error instanceof Error ? error.message : 'Unknown', adminId, rewardId, quantity });
       throw error;
     }
   }
@@ -261,14 +272,14 @@ export class AdminRewardsService {
 
       return {
         byCategory,
-        lowStock: Array.isArray(lowStock) ? lowStock.map((r: any) => ({
+        lowStock: Array.isArray(lowStock) ? lowStock.map((r: Record<string, unknown>) => ({
           id: r._id,
           name: r.name,
           stockAvailable: r.stockAvailable,
         })) : [],
       };
     } catch (error) {
-      typedLogger.error('Get reward analytics error', { error: (error as any).message, period });
+      typedLogger.error('Get reward analytics error', { error: error instanceof Error ? error.message : 'Unknown', period });
       throw error;
     }
   }
@@ -276,7 +287,7 @@ export class AdminRewardsService {
   /**
    * Log admin action for audit trail
    */
-  private static async logAction(adminId: string, action: string, resourceId: string, details: any) {
+  private static async logAction(adminId: string, action: string, resourceId: string, details: Record<string, unknown>) {
     // Use unified audit logger - writes to both Pino and MongoDB
     await audit.custom({
       userId: adminId,

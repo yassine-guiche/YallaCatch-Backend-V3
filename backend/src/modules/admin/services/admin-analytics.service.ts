@@ -2,16 +2,18 @@ import { Types } from 'mongoose';
 import { User, Prize, Claim, Reward, Redemption } from '@/models';
 import { Analytics } from '@/models/Analytics';
 import { AuditLog } from '@/models/AuditLog';
+import { MetricsService } from '@/services/metrics';
 import { typedLogger } from '@/lib/typed-logger';
 
 export class AdminAnalyticsService {
   static async getAnalytics(startDate?: string, endDate?: string) {
-    const query: any = {};
-    
+    const query: Record<string, unknown> = {};
+
     if (startDate || endDate) {
-      query.date = {};
-      if (startDate) query.date.$gte = new Date(startDate);
-      if (endDate) query.date.$lte = new Date(endDate);
+      const dateQuery: { $gte?: Date; $lte?: Date } = {};
+      if (startDate) dateQuery.$gte = new Date(startDate);
+      if (endDate) dateQuery.$lte = new Date(endDate);
+      query.date = dateQuery;
     }
 
     return Analytics.find(query).sort({ date: -1 });
@@ -71,8 +73,8 @@ export class AdminAnalyticsService {
       this.getDailyActivityData(startDate, endDate)
     ]);
 
-    const conversionRate = totalCaptures > 0 
-      ? ((totalRedemptions / totalCaptures) * 100).toFixed(2) 
+    const conversionRate = totalCaptures > 0
+      ? ((totalRedemptions / totalCaptures) * 100).toFixed(2)
       : '0.00';
 
     const revenueData = await Redemption.aggregate([
@@ -93,22 +95,24 @@ export class AdminAnalyticsService {
   static async getUsersAnalytics(period: string) {
     const { startDate, endDate } = this.parseTimeframe(period);
 
-    const [totalUsers, newUsers, activeUsers, topUsers, userGrowth] = await Promise.all([
-      User.countDocuments(),
-      User.countDocuments({ createdAt: { $gte: startDate, $lte: endDate } }),
-      User.countDocuments({ lastActive: { $gte: startDate } }),
+    const [totalUsers, newUsers, activeUsers, bannedUsers, topUsers, userGrowth] = await Promise.all([
+      User.countDocuments({ deletedAt: { $exists: false } }),
+      User.countDocuments({ createdAt: { $gte: startDate, $lte: endDate }, deletedAt: { $exists: false } }),
+      User.countDocuments({ isBanned: { $ne: true }, deletedAt: { $exists: false } }), // Active status (not banned, not deleted)
+      User.countDocuments({ isBanned: true, deletedAt: { $exists: false } }),
       this.getTopUsers(10),
       this.getUserGrowthData(startDate, endDate)
     ]);
 
-    const retentionRate = totalUsers > 0 
-      ? ((activeUsers / totalUsers) * 100).toFixed(2) 
+    const retentionRate = totalUsers > 0
+      ? ((activeUsers / totalUsers) * 100).toFixed(2)
       : '0.00';
 
     return {
       totalUsers,
       newUsers,
       activeUsers,
+      bannedUsers,
       retentionRate: parseFloat(retentionRate),
       topUsers,
       userGrowth
@@ -168,45 +172,61 @@ export class AdminAnalyticsService {
       'location.coordinates': { $exists: true }
     }).select('location claimedAt').lean();
 
-    return claims.map(claim => ({
-      lat: (claim as any).location?.coordinates?.[1] || 0,
-      lng: (claim as any).location?.coordinates?.[0] || 0,
-      weight: 1,
-      timestamp: claim.claimedAt
-    }));
+    return claims.map(claim => {
+      const claimWithLocation = claim as { location?: { coordinates?: number[] }; claimedAt?: Date };
+      return {
+        lat: claimWithLocation.location?.coordinates?.[1] || 0,
+        lng: claimWithLocation.location?.coordinates?.[0] || 0,
+        weight: 1,
+        timestamp: claim.claimedAt
+      };
+    });
   }
 
   static async getRealTimeStats() {
     const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
     const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000);
 
+    // Get real-time metrics from Redis via MetricsService
+    const realTimeMetrics = await MetricsService.getRealTimeMetrics();
+
+    // Aggregate DB stats for longer periods
     const [
       totalUsers,
-      active24h,
+      totalClaims, // Add total claims (all time)
       new24h,
       claims24h,
       pointsData,
-      activeSessions
+      claimsLastHour
     ] = await Promise.all([
       User.countDocuments(),
-      User.countDocuments({ lastActive: { $gte: twentyFourHoursAgo } }),
+      Claim.countDocuments(), // Check all time claims
       User.countDocuments({ createdAt: { $gte: twentyFourHoursAgo } }),
       Claim.countDocuments({ claimedAt: { $gte: twentyFourHoursAgo } }),
       Claim.aggregate([
         { $match: { claimedAt: { $gte: twentyFourHoursAgo } } },
-        { $group: { _id: null, total: { $sum: '$points' } } }
+        { $group: { _id: null, total: { $sum: '$pointsAwarded' } } }
       ]),
-      User.countDocuments({ lastActive: { $gte: fifteenMinutesAgo } })
+      Claim.countDocuments({ claimedAt: { $gte: oneHourAgo } })
     ]);
 
+    // Use MetricsService or DB fallbacks
     return {
-      users: totalUsers,
-      active24h,
+      activePlayers: (realTimeMetrics.business as any).activeUsers || 0, // Users active in last 15m (from Redis)
+      active24h: (realTimeMetrics.business as any).dailyActiveUsers || 0,
+      totalUsers,
       new24h,
       claims24h,
+      claimsLastHour,
       points24h: pointsData[0]?.total || 0,
-      activeSessions
+      prizesDistributed: totalClaims, // Map to all-time claims
+      systemHealth: {
+        cpu: (realTimeMetrics.system as any).cpuUsage?.user || 0,
+        memory: (realTimeMetrics.system as any).memoryUsage?.heapUsed || 0,
+        uptime: (realTimeMetrics.system as any).uptime || 0
+      },
+      unity: (realTimeMetrics as any).unity || {}
     };
   }
 
@@ -248,9 +268,9 @@ export class AdminAnalyticsService {
 
   private static async getTopUsers(limit: number) {
     return User.find()
-      .sort({ totalPoints: -1 })
+      .sort({ 'points.total': -1 })
       .limit(limit)
-      .select('username email totalPoints claimsCount')
+      .select('displayName email points stats.totalClaims avatar')
       .lean();
   }
 
@@ -318,7 +338,7 @@ export class AdminAnalyticsService {
         $group: {
           _id: { $dateToString: { format: '%Y-%m-%d', date: '$claimedAt' } },
           claims: { $sum: 1 },
-          points: { $sum: '$points' }
+          points: { $sum: '$pointsAwarded' }
         }
       },
       { $sort: { _id: 1 } }

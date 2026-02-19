@@ -2,8 +2,7 @@ import { FastifyInstance, FastifyRequest } from 'fastify';
 import { authenticate, requireAdmin } from '@/middleware/auth';
 import { adminRateLimit } from '@/middleware/distributed-rate-limit';
 import { AdminSettingsService } from '../services/admin-settings.service';
-import { configService } from '@/services/config';
-import { audit } from '@/lib/audit-logger';
+
 import { z } from 'zod';
 
 const ProgressionSettingsSchema = z.object({
@@ -36,21 +35,36 @@ const AntiCheatSettingsSchema = z.object({
 });
 
 const GameSettingsSchema = z.object({
-  claimRadiusMeters: z.number()
-    .min(1, { message: 'Claim radius must be at least 1 meter' })
-    .default(50),
-  maxDailyClaims: z.number()
-    .min(1, { message: 'Max daily claims must be at least 1' })
-    .default(50),
-  speedLimitKmh: z.number()
-    .min(1, { message: 'Speed limit must be at least 1 km/h' })
-    .default(120),
-  cooldownSeconds: z.number()
-    .min(0, { message: 'Cooldown cannot be negative' })
-    .default(60),
-  levelUpMultiplier: z.number()
-    .min(0.1, { message: 'Level up multiplier must be at least 0.1' })
-    .default(1.5),
+  prizeDetectionRadiusM: z.number().min(10).max(500).default(50),
+  catchRadiusM: z.number().min(1).max(50).default(5),
+  visibleRadiusM: z.number().min(5).max(100).default(20),
+  maxDailyClaims: z.number().min(1).default(50),
+  claimCooldownMs: z.number().min(0).default(300000), // 5 min
+  maxSpeedMs: z.number().min(1).max(100).default(15),
+
+  captureBonuses: z.object({
+    distance: z.object({
+      close: z.number().min(1),
+      perfect: z.number().min(1),
+      thresholdClose: z.number().min(0),
+      thresholdPerfect: z.number().min(0)
+    }),
+    technique: z.object({
+      gesture: z.number().min(1),
+      voice: z.number().min(1)
+    }),
+    validation: z.object({
+      highScore: z.number().min(1),
+      threshold: z.number().min(0).max(1)
+    })
+  }).optional(),
+
+  pointsPerClaim: z.object({
+    common: z.number().min(1),
+    rare: z.number().min(1),
+    epic: z.number().min(1),
+    legendary: z.number().min(1)
+  }).optional(),
 });
 
 const OfflineSettingsSchema = z.object({
@@ -68,7 +82,7 @@ const OfflineSettingsSchema = z.object({
     .default(2000),
 });
 
-type AdminRequest<P = Record<string, any>, B = any, Q = any> = FastifyRequest<{
+type AdminRequest<P = Record<string, unknown>, B = Record<string, unknown>, Q = Record<string, unknown>> = FastifyRequest<{
   Params: P;
   Body: B;
   Querystring: Q;
@@ -82,20 +96,19 @@ export default async function settingsRoutes(fastify: FastifyInstance) {
     try {
       const settings = await AdminSettingsService.getSettings();
       reply.send({ success: true, data: settings });
-    } catch (error: any) {
-      reply.code(500).send({ success: false, error: error.message });
+    } catch (error) {
+      reply.code(500).send({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
-  // Update settings (partial)
   fastify.patch('/settings', {
     preHandler: [authenticate, requireAdmin, adminRateLimit],
-  }, async (request: AdminRequest<{}, any>, reply) => {
+  }, async (request: AdminRequest<Record<string, never>, Record<string, unknown>>, reply) => {
     try {
       const settings = await AdminSettingsService.updateSettings(request.user.sub, request.body);
       reply.send({ success: true, data: settings });
-    } catch (error: any) {
-      reply.code(500).send({ success: false, error: error.message });
+    } catch (error) {
+      reply.code(500).send({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -106,20 +119,20 @@ export default async function settingsRoutes(fastify: FastifyInstance) {
     try {
       const data = await AdminSettingsService.getSettingsSection('progression');
       reply.send({ success: true, data });
-    } catch (error: any) {
-      reply.code(500).send({ success: false, error: error.message });
+    } catch (error) {
+      reply.code(500).send({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
   fastify.patch('/settings/progression', {
     preHandler: [authenticate, requireAdmin, adminRateLimit],
     schema: { body: ProgressionSettingsSchema },
-  }, async (request: AdminRequest<{}, z.infer<typeof ProgressionSettingsSchema>>, reply) => {
+  }, async (request: AdminRequest<Record<string, never>, z.infer<typeof ProgressionSettingsSchema>>, reply) => {
     try {
       const data = await AdminSettingsService.updateSettingsSection(request.user.sub, 'progression', request.body);
       reply.send({ success: true, data });
-    } catch (error: any) {
-      reply.code(500).send({ success: false, error: error.message });
+    } catch (error) {
+      reply.code(500).send({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -130,20 +143,20 @@ export default async function settingsRoutes(fastify: FastifyInstance) {
     try {
       const data = await AdminSettingsService.getSettingsSection('antiCheat');
       reply.send({ success: true, data });
-    } catch (error: any) {
-      reply.code(500).send({ success: false, error: error.message });
+    } catch (error) {
+      reply.code(500).send({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
   fastify.patch('/settings/anti-cheat', {
     preHandler: [authenticate, requireAdmin, adminRateLimit],
     schema: { body: AntiCheatSettingsSchema },
-  }, async (request: AdminRequest<{}, z.infer<typeof AntiCheatSettingsSchema>>, reply) => {
+  }, async (request: AdminRequest<Record<string, never>, z.infer<typeof AntiCheatSettingsSchema>>, reply) => {
     try {
       const data = await AdminSettingsService.updateSettingsSection(request.user.sub, 'antiCheat', request.body);
       reply.send({ success: true, data });
-    } catch (error: any) {
-      reply.code(500).send({ success: false, error: error.message });
+    } catch (error) {
+      reply.code(500).send({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -154,20 +167,20 @@ export default async function settingsRoutes(fastify: FastifyInstance) {
     try {
       const data = await AdminSettingsService.getSettingsSection('game');
       reply.send({ success: true, data });
-    } catch (error: any) {
-      reply.code(500).send({ success: false, error: error.message });
+    } catch (error) {
+      reply.code(500).send({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
   fastify.patch('/settings/game', {
     preHandler: [authenticate, requireAdmin, adminRateLimit],
     schema: { body: GameSettingsSchema },
-  }, async (request: AdminRequest<{}, z.infer<typeof GameSettingsSchema>>, reply) => {
+  }, async (request: AdminRequest<Record<string, never>, z.infer<typeof GameSettingsSchema>>, reply) => {
     try {
       const data = await AdminSettingsService.updateSettingsSection(request.user.sub, 'game', request.body);
       reply.send({ success: true, data });
-    } catch (error: any) {
-      reply.code(500).send({ success: false, error: error.message });
+    } catch (error) {
+      reply.code(500).send({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -178,32 +191,32 @@ export default async function settingsRoutes(fastify: FastifyInstance) {
     try {
       const data = await AdminSettingsService.getSettingsSection('offline');
       reply.send({ success: true, data });
-    } catch (error: any) {
-      reply.code(500).send({ success: false, error: error.message });
+    } catch (error) {
+      reply.code(500).send({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
   fastify.patch('/settings/offline', {
     preHandler: [authenticate, requireAdmin, adminRateLimit],
     schema: { body: OfflineSettingsSchema },
-  }, async (request: AdminRequest<{}, z.infer<typeof OfflineSettingsSchema>>, reply) => {
+  }, async (request: AdminRequest<Record<string, never>, z.infer<typeof OfflineSettingsSchema>>, reply) => {
     try {
       const data = await AdminSettingsService.updateSettingsSection(request.user.sub, 'offline', request.body);
       reply.send({ success: true, data });
-    } catch (error: any) {
-      reply.code(500).send({ success: false, error: error.message });
+    } catch (error) {
+      reply.code(500).send({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
   // Maintenance mode
   fastify.post('/maintenance/start', {
     preHandler: [authenticate, requireAdmin],
-  }, async (request: AdminRequest<{}, { message?: string }>, reply) => {
+  }, async (request: AdminRequest<Record<string, never>, { message?: string }>, reply) => {
     try {
       const result = await AdminSettingsService.startMaintenance(request.user.sub, request.body?.message);
       reply.send({ success: true, data: result });
-    } catch (error: any) {
-      reply.code(500).send({ success: false, error: error.message });
+    } catch (error) {
+      reply.code(500).send({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -213,121 +226,10 @@ export default async function settingsRoutes(fastify: FastifyInstance) {
     try {
       const result = await AdminSettingsService.stopMaintenance(request.user.sub);
       reply.send({ success: true, data: result });
-    } catch (error: any) {
-      reply.code(500).send({ success: false, error: error.message });
+    } catch (error) {
+      reply.code(500).send({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
-  // ===== NEW REAL-TIME CONFIG ENDPOINTS =====
 
-  // Get config version (for checking if config has changed)
-  fastify.get('/config/version', {
-    preHandler: [authenticate, requireAdmin, adminRateLimit],
-  }, async (request, reply) => {
-    try {
-      const version = configService.getVersion();
-      reply.send({ success: true, data: { version } });
-    } catch (error: any) {
-      reply.code(500).send({ success: false, error: error.message });
-    }
-  });
-
-  // Force reload config from database
-  fastify.post('/config/reload', {
-    preHandler: [authenticate, requireAdmin],
-  }, async (request: AdminRequest, reply) => {
-    try {
-      const adminId = request.user?.sub || 'system';
-      await configService.reload();
-      
-      // Audit log for config reload
-      await audit.custom(adminId, 'RELOAD_CONFIG', 'settings', undefined, {
-        timestamp: new Date().toISOString(),
-      });
-      
-      reply.send({ success: true, message: 'Config reloaded successfully' });
-    } catch (error: any) {
-      reply.code(500).send({ success: false, error: error.message });
-    }
-  });
-
-  // Get config history
-  fastify.get('/config/history', {
-    preHandler: [authenticate, requireAdmin, adminRateLimit],
-  }, async (request: AdminRequest<{}, {}, { section?: string; limit?: string }>, reply) => {
-    try {
-      const limit = request.query.limit ? parseInt(request.query.limit as string) : 50;
-      const history = await configService.getConfigHistory(request.query.section, limit);
-      reply.send({ success: true, data: history });
-    } catch (error: any) {
-      reply.code(500).send({ success: false, error: error.message });
-    }
-  });
-
-  // Get current active config (all sections)
-  fastify.get('/config/active', {
-    preHandler: [authenticate, requireAdmin, adminRateLimit],
-  }, async (request, reply) => {
-    try {
-      const config = await configService.getConfig();
-      reply.send({ success: true, data: config });
-    } catch (error: any) {
-      reply.code(500).send({ success: false, error: error.message });
-    }
-  });
-
-  // Validate config changes before applying
-  fastify.post('/config/validate', {
-    preHandler: [authenticate, requireAdmin, adminRateLimit],
-  }, async (request: AdminRequest<{}, { section: string; changes: Record<string, any> }>, reply) => {
-    try {
-      const result = await configService.validateConfigUpdate(
-        request.body.section,
-        request.body.changes
-      );
-      reply.send({ success: true, data: result });
-    } catch (error: any) {
-      reply.code(500).send({ success: false, error: error.message });
-    }
-  });
-
-  // Get specific config value (dot notation support)
-  fastify.get('/config/value/:path', {
-    preHandler: [authenticate, requireAdmin, adminRateLimit],
-  }, async (request: AdminRequest<{ path: string }>, reply) => {
-    try {
-      const value = await configService.getConfigValue(request.params.path);
-      reply.send({ success: true, data: { value } });
-    } catch (error: any) {
-      reply.code(500).send({ success: false, error: error.message });
-    }
-  });
-
-  // Update specific config value
-  fastify.patch('/config/value/:path', {
-    preHandler: [authenticate, requireAdmin],
-  }, async (request: AdminRequest<{ path: string }, { value: any }>, reply) => {
-    try {
-      const result = await configService.updateConfigValue(
-        request.params.path,
-        request.body.value,
-        request.user.sub
-      );
-      reply.send({ success: true, data: result });
-    } catch (error: any) {
-      reply.code(500).send({ success: false, error: error.message });
-    }
-  });
-
-  // Check if feature is enabled
-  fastify.get('/config/feature/:name', {
-    preHandler: [authenticate, requireAdmin, adminRateLimit],
-  }, async (request: AdminRequest<{ name: string }>, reply) => {
-    try {
-      const enabled = await configService.isFeatureEnabled(request.params.name);
-      reply.send({ success: true, data: { enabled } });
-    } catch (error: any) {
-      reply.code(500).send({ success: false, error: error.message });
-    }
-  });
 }

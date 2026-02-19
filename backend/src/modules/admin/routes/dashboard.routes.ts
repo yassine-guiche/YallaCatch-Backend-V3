@@ -5,18 +5,18 @@ import { AdminService } from '../services/admin-core.service';
 import { AdminAnalyticsService } from '../services/admin-analytics.service';
 
 export default async function dashboardRoutes(fastify: FastifyInstance) {
-  fastify.get('/dashboard', {
+  fastify.get<{ Querystring: { period?: string } }>('/dashboard', {
     preHandler: [authenticate, requireAdmin]
   }, async (request, reply) => {
     try {
-      const { period = '7d' } = request.query as { period?: string };
-      
+      const { period = '7d' } = request.query;
+
       // Get both core stats and analytics overview for daily activity
       const [coreStats, analyticsOverview] = await Promise.all([
         AdminService.getDashboardStats(),
         AdminAnalyticsService.getOverview(period)
       ]);
-      
+
       // Merge data for comprehensive dashboard
       const result = {
         ...coreStats,
@@ -30,6 +30,7 @@ export default async function dashboardRoutes(fastify: FastifyInstance) {
           unredeemed: coreStats.redemptions?.pending || 0,
           redeemed: coreStats.redemptions?.completed || 0,
         },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         dailyActivity: (analyticsOverview.dailyActivity || []).map((day: any) => ({
           date: day.date,
           captures: day.captures || day.claims || 0,
@@ -37,7 +38,7 @@ export default async function dashboardRoutes(fastify: FastifyInstance) {
           points: day.points || 0
         }))
       };
-      
+
       return { success: true, data: result };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to get dashboard stats';
@@ -57,15 +58,5 @@ export default async function dashboardRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.get('/audit-logs', {
-    preHandler: [authenticate, requireAdmin]
-  }, async (request, reply) => {
-    try {
-      const result = await AdminService.getAuditLogs(request.query as Record<string, unknown>);
-      return { success: true, data: result };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to get audit logs';
-      return reply.status(500).send({ success: false, error: message });
-    }
-  });
+
 }

@@ -13,7 +13,7 @@ const CreateTestSchema = z.object({
     z.object({
       name: z.string(),
       trafficAllocation: z.number().min(0).max(100),
-      config: z.record(z.any())
+      config: z.record(z.unknown())
     })
   ),
   startDate: z.string().datetime(),
@@ -35,9 +35,9 @@ export default async function abTestingRoutes(fastify: FastifyInstance) {
   fastify.post<{ Body: CreateTestRequest }>('/ab-testing', async (request, reply) => {
     try {
       const data = CreateTestSchema.parse(request.body);
-      const userId = (request as any).user?.sub || (request as any).userId;
+      const userId = request.user?.sub;
       const test = await ABTestingService.createTest(data as any, userId);
-      
+
       // Audit log
       await audit.custom({
         userId,
@@ -49,7 +49,7 @@ export default async function abTestingRoutes(fastify: FastifyInstance) {
         severity: 'low',
         metadata: { name: data.name, type: data.type },
       });
-      
+
       return reply.code(201).send({ success: true, data: test });
     } catch (error) {
       return reply.code(400).send({ success: false, error: (error as Error).message });
@@ -85,9 +85,9 @@ export default async function abTestingRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       try {
         const data = UpdateTestSchema.parse(request.body);
-        const userId = (request as any).user?.sub || (request as any).userId;
+        const userId = request.user?.sub;
         const test = await ABTestingService.updateTest(request.params.id, data as any);
-        
+
         // Audit log
         await audit.custom({
           userId,
@@ -99,7 +99,7 @@ export default async function abTestingRoutes(fastify: FastifyInstance) {
           severity: 'low',
           metadata: { changes: Object.keys(data) },
         });
-        
+
         return reply.send({ success: true, data: test });
       } catch (error) {
         return reply.code(400).send({ success: false, error: (error as Error).message });
@@ -110,9 +110,9 @@ export default async function abTestingRoutes(fastify: FastifyInstance) {
   // Start A/B Test
   fastify.post<{ Params: { id: string } }>('/ab-testing/:id/start', async (request, reply) => {
     try {
-      const userId = (request as any).user?.sub || (request as any).userId;
+      const userId = request.user?.sub;
       const test = await ABTestingService.startTest(request.params.id);
-      
+
       // Audit log
       await audit.custom({
         userId,
@@ -123,7 +123,7 @@ export default async function abTestingRoutes(fastify: FastifyInstance) {
         category: 'admin',
         severity: 'medium',
       });
-      
+
       return reply.send({ success: true, data: test });
     } catch (error) {
       return reply.code(400).send({ success: false, error: (error as Error).message });
@@ -133,9 +133,9 @@ export default async function abTestingRoutes(fastify: FastifyInstance) {
   // Pause A/B Test
   fastify.post<{ Params: { id: string } }>('/ab-testing/:id/pause', async (request, reply) => {
     try {
-      const userId = (request as any).user?.sub || (request as any).userId;
+      const userId = request.user?.sub;
       const test = await ABTestingService.pauseTest(request.params.id);
-      
+
       // Audit log
       await audit.custom({
         userId,
@@ -146,7 +146,7 @@ export default async function abTestingRoutes(fastify: FastifyInstance) {
         category: 'admin',
         severity: 'medium',
       });
-      
+
       return reply.send({ success: true, data: test });
     } catch (error) {
       return reply.code(400).send({ success: false, error: (error as Error).message });
@@ -156,9 +156,9 @@ export default async function abTestingRoutes(fastify: FastifyInstance) {
   // End A/B Test
   fastify.post<{ Params: { id: string } }>('/ab-testing/:id/end', async (request, reply) => {
     try {
-      const userId = (request as any).user?.sub || (request as any).userId;
+      const userId = request.user?.sub;
       const test = await ABTestingService.endTest(request.params.id);
-      
+
       // Audit log
       await audit.custom({
         userId,
@@ -169,7 +169,7 @@ export default async function abTestingRoutes(fastify: FastifyInstance) {
         category: 'admin',
         severity: 'medium',
       });
-      
+
       return reply.send({ success: true, data: test });
     } catch (error) {
       return reply.code(400).send({ success: false, error: (error as Error).message });
@@ -209,9 +209,9 @@ export default async function abTestingRoutes(fastify: FastifyInstance) {
   // Delete A/B Test
   fastify.delete<{ Params: { id: string } }>('/ab-testing/:id', async (request, reply) => {
     try {
-      const userId = (request as any).user?.sub || (request as any).userId;
+      const userId = request.user?.sub;
       await ABTestingService.deleteTest(request.params.id);
-      
+
       // Audit log
       await audit.custom({
         userId,
@@ -222,7 +222,7 @@ export default async function abTestingRoutes(fastify: FastifyInstance) {
         category: 'admin',
         severity: 'medium',
       });
-      
+
       return reply.send({ success: true, message: 'Test deleted successfully' });
     } catch (error) {
       return reply.code(500).send({ success: false, error: (error as Error).message });

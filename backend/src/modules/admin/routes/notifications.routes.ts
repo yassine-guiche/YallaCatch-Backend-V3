@@ -31,7 +31,7 @@ const SendNotificationSchema = z.object({
     .min(1, { message: 'Message is required' })
     .max(1000, { message: 'Message cannot exceed 1000 characters' }),
   type: normalizeType,
-  data: z.record(z.any()).optional(),
+  data: z.record(z.unknown()).optional(),
   targetUserIds: z.array(z.string())
     .min(1, { message: 'At least one target user ID is required' }),
 });
@@ -44,7 +44,7 @@ const BroadcastNotificationSchema = z.object({
     .min(1, { message: 'Message is required' })
     .max(1000, { message: 'Message cannot exceed 1000 characters' }),
   type: normalizeType,
-  data: z.record(z.any()).optional(),
+  data: z.record(z.unknown()).optional(),
 });
 
 const ScheduleNotificationSchema = z.object({
@@ -55,7 +55,7 @@ const ScheduleNotificationSchema = z.object({
     .min(1, { message: 'Message is required' })
     .max(1000, { message: 'Message cannot exceed 1000 characters' }),
   type: normalizeType,
-  data: z.record(z.any()).optional(),
+  data: z.record(z.unknown()).optional(),
   targetUserIds: z.array(z.string()).optional(),
   scheduledFor: z.string().datetime({ message: 'scheduledFor must be a valid ISO 8601 datetime (e.g., 2024-01-15T10:30:00Z)' }),
 });
@@ -71,7 +71,7 @@ const NotificationTemplateSchema = z.object({
   name: z.string().min(1),
   channel: z.enum(['push', 'email', 'sms', 'in_app']),
   variables: z.array(z.string()).default([]),
-  content: z.record(z.any()).optional(),
+  content: z.record(z.unknown()).optional(),
 });
 
 export default async function notificationsRoutes(fastify: FastifyInstance) {
@@ -93,21 +93,21 @@ export default async function notificationsRoutes(fastify: FastifyInstance) {
 
   fastify.post('/notifications/send', async (request: FastifyRequest, reply) => {
     const payload = SendNotificationSchema.parse(request.body);
-    const adminId = (request as any).user?.sub || (request as any).userId;
+    const adminId = request.user?.sub;
     const result = await AdminNotificationsService.sendNotification(adminId, payload as any);
     return reply.send(result);
   });
 
   fastify.post('/notifications/broadcast', async (request: FastifyRequest, reply) => {
     const payload = BroadcastNotificationSchema.parse(request.body);
-    const adminId = (request as any).user?.sub || (request as any).userId;
+    const adminId = request.user?.sub;
     const result = await AdminNotificationsService.broadcastNotification(adminId, payload as any);
     return reply.send(result);
   });
 
   fastify.post('/notifications/schedule', async (request: FastifyRequest, reply) => {
     const payload = ScheduleNotificationSchema.parse(request.body);
-    const adminId = (request as any).user?.sub || (request as any).userId;
+    const adminId = request.user?.sub;
     const result = await AdminNotificationsService.scheduleNotification(adminId, {
       ...payload,
       scheduledFor: new Date(payload.scheduledFor),
@@ -123,20 +123,20 @@ export default async function notificationsRoutes(fastify: FastifyInstance) {
 
   fastify.post('/notifications/templates', async (request: FastifyRequest, reply) => {
     const payload = NotificationTemplateSchema.parse(request.body);
-    const adminId = (request as any).user?.sub || (request as any).userId;
+    const adminId = request.user?.sub;
     const template = await AdminNotificationsService.createTemplate(adminId, payload as any);
     return reply.code(201).send({ success: true, data: template });
   });
 
   fastify.patch('/notifications/templates/:templateId', async (request: FastifyRequest<{ Params: { templateId: string } }>, reply) => {
     const changes = NotificationTemplateSchema.partial().parse(request.body);
-    const adminId = (request as any).user?.sub || (request as any).userId;
-    const updated = await AdminNotificationsService.updateTemplate(adminId, request.params.templateId, changes as any);
+    const adminId = request.user?.sub;
+    const updated = await AdminNotificationsService.updateTemplate(adminId, request.params.templateId, changes);
     return reply.send({ success: true, data: updated });
   });
 
   fastify.delete('/notifications/templates/:templateId', async (request: FastifyRequest<{ Params: { templateId: string } }>, reply) => {
-    const adminId = (request as any).user?.sub || (request as any).userId;
+    const adminId = request.user?.sub;
     await AdminNotificationsService.deleteTemplate(adminId, request.params.templateId);
     return reply.status(204).send();
   });

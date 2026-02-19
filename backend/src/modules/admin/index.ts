@@ -20,11 +20,24 @@ import {
   analyticsRoutes,
   distributionRoutes,
   partnersRoutes,
-  extraRoutes,
+
   antiCheatRoutes,
   powerUpRoutes,
   abTestingRoutes,
   gameControlRoutes,
+  admobRoutes,
+  configRoutes,
+  achievementsRoutes,
+  marketplaceRoutes,
+  reportsRoutes,
+  sessionsRoutes,
+  friendshipsRoutes,
+  codesRoutes,
+  offlineQueueRoutes,
+  deviceTokensRoutes,
+  redemptionsRoutes,
+  activityLogsRoutes,
+  arSessionsRoutes
 } from './routes/index.js';
 
 // Re-export services for external use
@@ -38,6 +51,12 @@ export default async function adminModule(fastify: FastifyInstance) {
   // Dashboard & Core
   await fastify.register(dashboardRoutes);
 
+  // AdMob Management
+  await fastify.register(admobRoutes, { prefix: '/admob' });
+
+  // Config Management
+  await fastify.register(configRoutes, { prefix: '/config' });
+
   // User Management
   await fastify.register(usersRoutes);
 
@@ -50,7 +69,7 @@ export default async function adminModule(fastify: FastifyInstance) {
   // Claims/Captures Management
   await fastify.register(claimsRoutes);
 
-  // Power-Ups Management (NEW)
+  // Power-Ups Management
   await fastify.register(powerUpRoutes, { prefix: '/power-ups' });
 
   // Notifications
@@ -59,7 +78,7 @@ export default async function adminModule(fastify: FastifyInstance) {
   // Settings
   await fastify.register(settingsRoutes);
 
-  // Anti-Cheat Monitoring (NEW)
+  // Anti-Cheat Monitoring
   await fastify.register(antiCheatRoutes, { prefix: '/anti-cheat' });
 
   // System
@@ -74,12 +93,44 @@ export default async function adminModule(fastify: FastifyInstance) {
   // Partners
   await fastify.register(partnersRoutes);
 
-  // A/B Testing (NEW)
+  // A/B Testing
   await fastify.register(abTestingRoutes);
 
-  // Game Control (Admin game monitoring and management)
+  // Game Control
   await fastify.register(gameControlRoutes, { prefix: '/game-control' });
 
-  // Extra routes (achievements, marketplace, reports, sessions, etc.)
-  await fastify.register(extraRoutes);
+  // --- REFACTORED EXTRA ROUTES ---
+
+  // Achievements
+  await fastify.register(achievementsRoutes, { prefix: '/achievements' });
+
+  // Marketplace
+  await fastify.register(marketplaceRoutes, { prefix: '/marketplace' });
+
+  // Reports
+  await fastify.register(reportsRoutes, { prefix: '/reports' });
+
+  // Sessions
+  await fastify.register(sessionsRoutes, { prefix: '/sessions' });
+
+  // Friendships
+  await fastify.register(friendshipsRoutes, { prefix: '/friendships' });
+
+  // Promo Codes
+  await fastify.register(codesRoutes, { prefix: '/codes' });
+
+  // Offline Queue
+  await fastify.register(offlineQueueRoutes, { prefix: '/offline-queue' });
+
+  // Device Tokens
+  await fastify.register(deviceTokensRoutes, { prefix: '/device-tokens' });
+
+  // Redemptions
+  await fastify.register(redemptionsRoutes, { prefix: '/redemptions' });
+
+  // Activity Logs
+  await fastify.register(activityLogsRoutes, { prefix: '/activity-logs' });
+
+  // AR Sessions
+  await fastify.register(arSessionsRoutes, { prefix: '/ar-sessions' });
 }

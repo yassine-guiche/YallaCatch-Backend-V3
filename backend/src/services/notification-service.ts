@@ -4,7 +4,7 @@ import { UserNotification } from '@/models/UserNotification';
 import { User } from '@/models/User';
 import { PushNotificationService } from './push-notifications';
 import { typedLogger } from '@/lib/typed-logger';
-import { NotificationType, NotificationTargetType, NotificationStatus } from '@/types';
+import { NotificationType, NotificationTargetType } from '@/types';
 import { z } from 'zod';
 
 // Input validation schemas
@@ -22,7 +22,7 @@ type SendNotificationPayload = {
     email?: boolean;
     inApp?: boolean;
   };
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 };
 
 const sendNotificationSchema = z.object({
@@ -39,7 +39,7 @@ const sendNotificationSchema = z.object({
     email: z.boolean().optional(),
     inApp: z.boolean().optional()
   }).optional(),
-  metadata: z.record(z.any()).optional()
+  metadata: z.record(z.unknown()).optional()
 });
 
 const getUserNotificationsSchema = z.object({
@@ -124,9 +124,9 @@ export class UnifiedNotificationService {
         data: validatedData.metadata,
         type: validatedData.type
       }).catch(error => {
-        typedLogger.error('Async notification delivery failed', { 
-          error: (error as any).message, 
-          notificationId: globalNotification._id 
+        typedLogger.error('Async notification delivery failed', {
+          error: error instanceof Error ? error.message : String(error),
+          notificationId: globalNotification._id
         });
       });
 
@@ -148,7 +148,7 @@ export class UnifiedNotificationService {
       if (error instanceof z.ZodError) {
         throw new Error(`VALIDATION_ERROR: ${error.errors.map(e => e.message).join(', ')}`);
       }
-      typedLogger.error('Send notification error', { error: (error as any).message, input });
+      typedLogger.error('Send notification error', { error: error instanceof Error ? error.message : String(error), input });
       throw error;
     }
   }
@@ -161,12 +161,13 @@ export class UnifiedNotificationService {
       let userIds: string[] = [];
 
       switch (data.targetType) {
-        case 'all':
+        case 'all': {
           const allUsers = await User.find({ isBanned: false }).select('_id');
           userIds = allUsers.map(user => user._id.toString());
           break;
+        }
 
-        case 'city':
+        case 'city': {
           if (data.targetValue) {
             const cityUsers = await User.find({
               'location.city': data.targetValue,
@@ -175,8 +176,9 @@ export class UnifiedNotificationService {
             userIds = cityUsers.map(user => user._id.toString());
           }
           break;
+        }
 
-        case 'level':
+        case 'level': {
           if (data.targetValue) {
             const levelUsers = await User.find({
               level: data.targetValue,
@@ -185,8 +187,9 @@ export class UnifiedNotificationService {
             userIds = levelUsers.map(user => user._id.toString());
           }
           break;
+        }
 
-        case 'user':
+        case 'user': {
           if (data.targetValue) {
             // Validate that targetValue is a valid ObjectId
             if (!Types.ObjectId.isValid(data.targetValue)) {
@@ -198,6 +201,7 @@ export class UnifiedNotificationService {
             }
           }
           break;
+        }
 
         default:
           userIds = [];
@@ -205,7 +209,7 @@ export class UnifiedNotificationService {
 
       return userIds;
     } catch (error) {
-      typedLogger.error('Get target users error', { error: (error as any).message, data });
+      typedLogger.error('Get target users error', { error: error instanceof Error ? error.message : String(error), data });
       throw error;
     }
   }
@@ -214,18 +218,18 @@ export class UnifiedNotificationService {
    * Initiate async delivery of notifications
    */
   private static async initiateDelivery(
-    notificationId: string, 
-    userIds: string[], 
-    payload: { title: string; body: string; data?: any; type?: string }
+    notificationId: string,
+    userIds: string[],
+    payload: { title: string; body: string; data?: Record<string, unknown>; type?: string }
   ) {
     try {
       // Process delivery in batches to avoid overwhelming the system
       const batchSize = 100;
       for (let i = 0; i < userIds.length; i += batchSize) {
         const batch = userIds.slice(i, i + batchSize);
-        
+
         // Send to each user in the batch
-        await Promise.allSettled(batch.map(userId => 
+        await Promise.allSettled(batch.map(userId =>
           this.deliverToUser(notificationId, userId, payload)
         ));
       }
@@ -236,7 +240,7 @@ export class UnifiedNotificationService {
         batches: Math.ceil(userIds.length / batchSize)
       });
     } catch (error) {
-      typedLogger.error('Initiate delivery error', { error: (error as any).message, notificationId, userIdCount: userIds.length });
+      typedLogger.error('Initiate delivery error', { error: error instanceof Error ? error.message : String(error), notificationId, userIdCount: userIds.length });
       throw error;
     }
   }
@@ -247,14 +251,14 @@ export class UnifiedNotificationService {
   private static async deliverToUser(
     notificationId: string,
     userId: string,
-    payload: { title: string; body: string; data?: any; type?: string }
+    payload: { title: string; body: string; data?: Record<string, unknown>; type?: string }
   ): Promise<void> {
     try {
       // Update user notification status to delivered
       await UserNotification.findOneAndUpdate(
-        { 
+        {
           notificationId: new Types.ObjectId(notificationId),
-          userId: new Types.ObjectId(userId) 
+          userId: new Types.ObjectId(userId)
         },
         {
           $set: {
@@ -266,6 +270,7 @@ export class UnifiedNotificationService {
       );
 
       // Send via appropriate channel
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const result = await PushNotificationService.sendToUser(userId, {
         title: payload.title,
         body: payload.body,
@@ -275,9 +280,9 @@ export class UnifiedNotificationService {
 
       // Update delivery status based on result
       await UserNotification.findOneAndUpdate(
-        { 
+        {
           notificationId: new Types.ObjectId(notificationId),
-          userId: new Types.ObjectId(userId) 
+          userId: new Types.ObjectId(userId)
         },
         {
           $set: {
@@ -290,29 +295,29 @@ export class UnifiedNotificationService {
       typedLogger.info('Notification delivered to user', {
         notificationId,
         userId,
-        deliveryResult: result.map(r => ({ 
-          deviceId: r.deviceId, 
-          success: r.success, 
-          error: r.error 
+        deliveryResult: result.map(r => ({
+          deviceId: r.deviceId,
+          success: r.success,
+          error: r.error
         }))
       });
     } catch (error) {
-      typedLogger.error('Deliver to user error', { 
-        error: (error as any).message, 
-        notificationId, 
-        userId 
+      typedLogger.error('Deliver to user error', {
+        error: error instanceof Error ? error.message : String(error),
+        notificationId,
+        userId
       });
-      
+
       // Update with error status
       await UserNotification.findOneAndUpdate(
-        { 
+        {
           notificationId: new Types.ObjectId(notificationId),
-          userId: new Types.ObjectId(userId) 
+          userId: new Types.ObjectId(userId)
         },
         {
           $set: {
             status: 'failed',
-            errorReason: (error as any).message
+            errorReason: error instanceof Error ? error.message : String(error)
           }
         }
       );
@@ -325,25 +330,27 @@ export class UnifiedNotificationService {
   static async getUserNotifications(input: z.infer<typeof getUserNotificationsSchema>) {
     try {
       const validatedData = getUserNotificationsSchema.parse(input);
-      
+
       const userId = new Types.ObjectId(validatedData.userId);
       const page = validatedData.page;
       const limit = validatedData.limit;
       const skip = (page - 1) * limit;
 
       // Build query for user notifications
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const query: any = { userId };
-      
+
       if (validatedData.unreadOnly) {
         query.isRead = false;
       }
-      
+
       if (validatedData.type) {
         // This would require a more complex query to match the type in the related Notification document
         // For now, we'll handle this in the aggregate lookup stage
       }
 
       // Build aggregation pipeline
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const pipeline: any[] = [
         { $match: query },
         {
@@ -398,6 +405,7 @@ export class UnifiedNotificationService {
       const results = await UserNotification.aggregate(pipeline);
 
       // Count total for pagination (apply same filters)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const countPipeline: any[] = [
         { $match: query },
         {
@@ -441,7 +449,7 @@ export class UnifiedNotificationService {
       if (error instanceof z.ZodError) {
         throw new Error(`VALIDATION_ERROR: ${error.errors.map(e => e.message).join(', ')}`);
       }
-      typedLogger.error('Get user notifications error', { error: (error as any).message, input });
+      typedLogger.error('Get user notifications error', { error: error instanceof Error ? error.message : String(error), input });
       throw error;
     }
   }
@@ -453,6 +461,7 @@ export class UnifiedNotificationService {
     try {
       const validatedData = markAsReadSchema.parse(input);
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const updateQuery: any = {
         userId: new Types.ObjectId(validatedData.userId)
       };
@@ -508,7 +517,7 @@ export class UnifiedNotificationService {
       if (error instanceof z.ZodError) {
         throw new Error(`VALIDATION_ERROR: ${error.errors.map(e => e.message).join(', ')}`);
       }
-      typedLogger.error('Mark notifications as read error', { error: (error as any).message, input });
+      typedLogger.error('Mark notifications as read error', { error: error instanceof Error ? error.message : String(error), input });
       throw error;
     }
   }
@@ -554,10 +563,10 @@ export class UnifiedNotificationService {
           $group: {
             _id: null,
             totalUserNotifications: { $sum: 1 },
-            totalRead: { 
-              $sum: { 
-                $cond: ['$isRead', 1, 0] 
-              } 
+            totalRead: {
+              $sum: {
+                $cond: ['$isRead', 1, 0]
+              }
             },
             totalDelivered: {
               $sum: {
@@ -569,8 +578,8 @@ export class UnifiedNotificationService {
       ]);
 
       // Calculate open rate
-      const openRate = globalStats[0]?.totalDelivered > 0 
-        ? (globalStats[0]?.totalOpened / globalStats[0]?.totalDelivered) * 100 
+      const openRate = globalStats[0]?.totalDelivered > 0
+        ? (globalStats[0]?.totalOpened / globalStats[0]?.totalDelivered) * 100
         : 0;
 
       return {
@@ -591,7 +600,7 @@ export class UnifiedNotificationService {
         timestamp: new Date().toISOString()
       };
     } catch (error) {
-      typedLogger.error('Get notification stats error', { error: (error as any).message });
+      typedLogger.error('Get notification stats error', { error: error instanceof Error ? error.message : String(error) });
       throw error;
     }
   }
@@ -606,7 +615,7 @@ export class UnifiedNotificationService {
       }
 
       const user = await User.findById(userId).select('preferences.notifications').lean();
-      
+
       if (!user) {
         throw new Error('USER_NOT_FOUND');
       }
@@ -627,7 +636,7 @@ export class UnifiedNotificationService {
         }
       };
     } catch (error) {
-      typedLogger.error('Get user preferences error', { error: (error as any).message, userId });
+      typedLogger.error('Get user preferences error', { error: error instanceof Error ? error.message : String(error), userId });
       throw error;
     }
   }
@@ -635,7 +644,7 @@ export class UnifiedNotificationService {
   /**
    * Update user's notification preferences
    */
-  static async updateUserPreferences(userId: string, preferences: any) {
+  static async updateUserPreferences(userId: string, preferences: Record<string, unknown>) {
     try {
       if (!Types.ObjectId.isValid(userId)) {
         throw new Error('INVALID_USER_ID');
@@ -651,17 +660,17 @@ export class UnifiedNotificationService {
         throw new Error('USER_NOT_FOUND');
       }
 
-      typedLogger.info('User notification preferences updated', { 
-        userId, 
-        preferences 
+      typedLogger.info('User notification preferences updated', {
+        userId,
+        preferences
       });
 
       return updatedUser.preferences?.notifications;
     } catch (error) {
-      typedLogger.error('Update user preferences error', { 
-        error: (error as any).message, 
-        userId, 
-        preferences 
+      typedLogger.error('Update user preferences error', {
+        error: error instanceof Error ? error.message : String(error),
+        userId,
+        preferences
       });
       throw error;
     }
@@ -673,7 +682,7 @@ export class UnifiedNotificationService {
   static async cleanupExpiredNotifications() {
     try {
       const now = new Date();
-      
+
       // Find notifications that have expired and are no longer needed
       const result = await Notification.deleteMany({
         expiresAt: { $lt: now },
@@ -689,7 +698,7 @@ export class UnifiedNotificationService {
         deletedCount: result.deletedCount
       };
     } catch (error) {
-      typedLogger.error('Cleanup expired notifications error', { error: (error as any).message });
+      typedLogger.error('Cleanup expired notifications error', { error: error instanceof Error ? error.message : String(error) });
       throw error;
     }
   }

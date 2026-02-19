@@ -123,7 +123,7 @@ export async function startScheduledJobs() {
           expiresAt: { $lt: new Date() },
           status: 'active'
         });
-        
+
         if (result.deletedCount > 0) {
           typedLogger.info('Expired prizes cleaned up', { count: result.deletedCount });
         }
@@ -145,7 +145,7 @@ export async function startScheduledJobs() {
             $set: { isBanned: false }
           }
         );
-        
+
         if (result.modifiedCount > 0) {
           typedLogger.info('Expired bans lifted', { count: result.modifiedCount });
         }
@@ -154,31 +154,31 @@ export async function startScheduledJobs() {
       }
     }, 60 * 60 * 1000); // Every hour
 
+    // Process scheduled notifications every minute
+    setInterval(async () => {
+      try {
+        const now = new Date();
+        const due = await Notification.find({ status: NotificationStatus.SCHEDULED, scheduledFor: { $lte: now } });
+        for (const n of due) {
+          try {
+            await (NotificationService as any).processNotification(n);
+            n.status = NotificationStatus.SENT as any;
+            (n as any).sentAt = new Date();
+            await n.save();
+          } catch (err: any) {
+            (n as any).status = NotificationStatus.FAILED as any;
+            await n.save();
+            typedLogger.error('Scheduled notification send failed', { id: n._id, error: err.message });
+          }
+        }
+      } catch (err: any) {
+        typedLogger.error('Scheduled notifications job error', { error: err.message });
+      }
+    }, 60 * 1000);
+
     typedLogger.info('Scheduled jobs started');
   } catch (error) {
     typedLogger.error('Failed to start scheduled jobs', { error: (error as any).message });
     throw error;
   }
 }
-
-// Process scheduled notifications every minute
-setInterval(async () => {
-  try {
-    const now = new Date();
-    const due = await Notification.find({ status: NotificationStatus.SCHEDULED, scheduledFor: { $lte: now } });
-    for (const n of due) {
-      try {
-        await (NotificationService as any).processNotification(n);
-        n.status = NotificationStatus.SENT as any;
-        (n as any).sentAt = new Date();
-        await n.save();
-      } catch (err: any) {
-        (n as any).status = NotificationStatus.FAILED as any;
-        await n.save();
-        typedLogger.error('Scheduled notification send failed', { id: n._id, error: err.message });
-      }
-    }
-  } catch (err: any) {
-    typedLogger.error('Scheduled notifications job error', { error: err.message });
-  }
-}, 60 * 1000);

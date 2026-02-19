@@ -10,6 +10,7 @@ import { Prize } from '@/models/Prize';
 import { Settings } from '@/models/Settings';
 import { typedLogger } from '@/lib/typed-logger';
 import { audit } from '@/lib/audit-logger';
+import { MetricsService } from '@/services/metrics';
 
 type AdminRequest<P = Record<string, unknown>, B = unknown, Q = unknown> = FastifyRequest<{
   Params: P;
@@ -27,7 +28,7 @@ export default async function gameControlRoutes(fastify: FastifyInstance) {
   // Get active game sessions
   fastify.get('/game/sessions/active', {
     preHandler: [authenticate, requireAdmin, adminRateLimit],
-  }, async (request: AdminRequest<{}, {}, { page?: string; limit?: string; userId?: string; city?: string }>, reply) => {
+  }, async (request: AdminRequest<Record<string, never>, unknown, { page?: string; limit?: string; userId?: string; city?: string }>, reply) => {
     try {
       const page = parseInt(request.query.page || '1');
       const limit = parseInt(request.query.limit || '20');
@@ -44,7 +45,7 @@ export default async function gameControlRoutes(fastify: FastifyInstance) {
           if (session.status === 'active') {
             // Filter by userId if provided
             if (request.query.userId && session.userId !== request.query.userId) continue;
-            
+
             // Get user info
             const user = await User.findById(session.userId).select('displayName email level').lean();
             sessions.push({
@@ -87,13 +88,13 @@ export default async function gameControlRoutes(fastify: FastifyInstance) {
       // Check if session exists in Redis
       const sessionKey = `session:${sessionId}`;
       const sessionData = await redisClient.get(sessionKey);
-      
+
       if (!sessionData) {
         return reply.code(404).send({ success: false, error: 'Session not found or already ended' });
       }
 
       const session = JSON.parse(sessionData);
-      
+
       // Force end the session using GameService
       try {
         await GameService.endGameSession(session.userId, sessionId);
@@ -101,7 +102,7 @@ export default async function gameControlRoutes(fastify: FastifyInstance) {
         // Even if GameService fails (e.g. logic error), force delete from Redis to kill it
         await redisClient.del(sessionKey);
       }
-      
+
       // Log this admin action
       await audit.custom(
         (request.user as { sub: string }).sub,
@@ -120,7 +121,7 @@ export default async function gameControlRoutes(fastify: FastifyInstance) {
   // Get session history from database
   fastify.get('/game/sessions/history', {
     preHandler: [authenticate, requireAdmin, adminRateLimit],
-  }, async (request: AdminRequest<{}, {}, { page?: string; limit?: string; userId?: string; startDate?: string; endDate?: string }>, reply) => {
+  }, async (request: AdminRequest<Record<string, never>, unknown, { page?: string; limit?: string; userId?: string; startDate?: string; endDate?: string }>, reply) => {
     try {
       const page = parseInt(request.query.page || '1');
       const limit = parseInt(request.query.limit || '20');
@@ -250,7 +251,7 @@ export default async function gameControlRoutes(fastify: FastifyInstance) {
   // Get leaderboard
   fastify.get('/game/leaderboard', {
     preHandler: [authenticate, requireAdmin, adminRateLimit],
-  }, async (request: AdminRequest<{}, {}, { type?: string; limit?: string; city?: string }>, reply) => {
+  }, async (request: AdminRequest<Record<string, never>, unknown, { type?: string; limit?: string; city?: string }>, reply) => {
     try {
       const type = request.query.type || 'points';
       const limit = parseInt(request.query.limit || '50');
@@ -297,7 +298,7 @@ export default async function gameControlRoutes(fastify: FastifyInstance) {
   // Reset leaderboard (clear points for specific type)
   fastify.post('/game/leaderboard/reset', {
     preHandler: [authenticate, requireAdmin],
-  }, async (request: AdminRequest<{}, { type: string; scope?: string; confirm?: boolean }>, reply) => {
+  }, async (request: AdminRequest<Record<string, never>, { type: string; scope?: string; confirm?: boolean }>, reply) => {
     try {
       if (!request.body.confirm) {
         return reply.code(400).send({
@@ -381,7 +382,7 @@ export default async function gameControlRoutes(fastify: FastifyInstance) {
   // Update challenge template
   fastify.post('/game/challenges', {
     preHandler: [authenticate, requireAdmin],
-  }, async (request: AdminRequest<{}, { id: string; title: string; description: string; type: string; target: number; reward: number }>, reply) => {
+  }, async (request: AdminRequest<Record<string, never>, { id: string; title: string; description: string; type: string; target: number; reward: number }>, reply) => {
     try {
       const challengeData = request.body;
 
@@ -461,4 +462,67 @@ export default async function gameControlRoutes(fastify: FastifyInstance) {
       reply.code(500).send({ success: false, error: error instanceof Error ? error.message : String(error) });
     }
   });
+
+  // ==================== METRICS & PERFORMANCE ====================
+
+  // Get real-time metrics (Secure Admin Endpoint)
+  fastify.get('/game/metrics/realtime', {
+    preHandler: [authenticate, requireAdmin, adminRateLimit]
+  }, async (request, reply) => {
+    try {
+      const metrics = await MetricsService.getRealTimeMetrics();
+      reply.send({ success: true, data: metrics });
+    } catch (error) {
+      reply.code(500).send({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  // Get metric history for charts (Secure Admin Endpoint)
+  fastify.get<{ Querystring: { metric: string; range?: string } }>(
+    '/game/metrics/history',
+    {
+      preHandler: [authenticate, requireAdmin, adminRateLimit],
+      schema: {
+        querystring: z.object({
+          metric: z.string(),
+          range: z.enum(['1h', '24h', '7d', '30d']).optional()
+        })
+      }
+    },
+    async (request, reply) => {
+      try {
+        const { metric, range } = request.query;
+        const history = await MetricsService.getMetricHistory(metric, range || '1h');
+        reply.send({ success: true, data: history });
+      } catch (error) {
+        reply.code(500).send({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
+      }
+    }
+  );
+
+  // Get Unity performance report (Secure Admin Endpoint)
+  fastify.get<{ Querystring: { start?: string; end?: string } }>(
+    '/game/metrics/unity-performance',
+    {
+      preHandler: [authenticate, requireAdmin, adminRateLimit],
+      schema: {
+        querystring: z.object({
+          start: z.string().datetime().optional(),
+          end: z.string().datetime().optional()
+        })
+      }
+    },
+    async (request, reply) => {
+      try {
+        const now = new Date();
+        const start = request.query.start ? new Date(request.query.start) : new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        const end = request.query.end ? new Date(request.query.end) : now;
+
+        const metrics = await MetricsService.getUnityPerformanceMetrics({ start, end });
+        reply.send({ success: true, data: metrics });
+      } catch (error) {
+        reply.code(500).send({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
+      }
+    }
+  );
 }

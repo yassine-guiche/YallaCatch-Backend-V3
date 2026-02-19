@@ -10,6 +10,8 @@ import { setupWebSocket } from './lib/websocket.js';
 import fastifyCors from '@fastify/cors';
 import { createHash } from 'crypto';
 import fastifyStatic from '@fastify/static';
+
+import fastifyCompress from '@fastify/compress';
 import path from 'path';
 
 console.log('ðŸš€ Starting YallaCatch Backend...');
@@ -23,16 +25,19 @@ async function createServer(): Promise<FastifyInstance> {
     trustProxy: config.NODE_ENV === 'production',
     bodyLimit: 10 * 1024 * 1024, // 10MB
     keepAliveTimeout: 30000,
-    // Disable schema validation errors for now
+    // Use standardized error handler
     schemaErrorFormatter: (errors, dataVar) => {
-      return new Error('Validation error');
+      // This is a fallback; the global error handler should catch most things
+      const error = new Error('Validation error');
+      (error as any).validation = errors;
+      return error;
     },
     ajv: {
       customOptions: {
         removeAdditional: false,
         useDefaults: true,
         coerceTypes: true,
-        allErrors: false,
+        allErrors: true,
       },
     },
   });
@@ -44,16 +49,18 @@ async function createServer(): Promise<FastifyInstance> {
       if (candidate && typeof candidate.safeParse === 'function') {
         const result = candidate.safeParse(data);
         if (!result.success) {
-          const details = result.error.issues
-            .map(issue => `${issue.path.join('.') || 'value'} ${issue.message}`)
-            .join('; ');
-          throw new Error(details || 'Validation error');
+          // Propagate the raw Zod error to be handled by the global error handler
+          throw result.error;
         }
         return result.data;
       }
       return data;
     };
   });
+
+  // Register global error handler
+  const { errorHandler } = await import('./middleware/error.js');
+  server.setErrorHandler(errorHandler);
 
   // Health check endpoint
   server.get('/health', async (request, reply) => {
@@ -79,7 +86,7 @@ async function createServer(): Promise<FastifyInstance> {
   });
 
   // Basic caching headers helper
-  server.decorateReply('setStaticCache', function(this: any, maxAgeSeconds: number = 86400) {
+  server.decorateReply('setStaticCache', function (this: any, maxAgeSeconds: number = 86400) {
     this.header('Cache-Control', `public, max-age=${maxAgeSeconds}, immutable`);
     return this;
   });
@@ -169,6 +176,42 @@ async function createServer(): Promise<FastifyInstance> {
     }
   });
 
+  // Security headers
+  await server.register(import('@fastify/helmet'), {
+    contentSecurityPolicy: config.NODE_ENV === 'development' ? false : {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        frameSrc: ["'none'"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+  });
+
+  // Compression support
+  // await server.register(fastifyCompress, {
+  //   global: true,
+  //   encodings: ['gzip', 'deflate'],
+  // });
+
+  // Multipart support for file uploads
+  await server.register(import('@fastify/multipart'), {
+    limits: {
+      fieldNameSize: 100,
+      fieldSize: 100,
+      fields: 10,
+      fileSize: (config as any).UPLOAD_MAX_SIZE || 10 * 1024 * 1024, // 10MB default
+      files: 5,
+      headerPairs: 2000,
+    },
+  });
+
   // Static mounts
   await server.register(fastifyStatic, {
     root: path.join(process.cwd(), '..', 'admin', 'dist'),
@@ -213,20 +256,22 @@ async function registerRoutes(server: FastifyInstance): Promise<void> {
     // const analyticsRoutes = (await import('./modules/analytics/routes.js')).default; // Merged into admin
     const gamificationRoutes = (await import('./modules/gamification/routes.js')).default;
     // const partnersRoutes = (await import('./modules/partners/routes.js')).default; // Merged into admin
-    const captureRoutes = (await import('./modules/capture/routes.js')).default;
+    const captureRoutes = (await import('./modules/capture/index.js')).default;
     const marketplaceRoutes = (await import('./modules/marketplace/routes.js')).default;
+    const partnerMarketplaceRoutes = (await import('./modules/partner/routes.js')).default;
     // const distributionRoutes = (await import('./modules/distribution/routes.js')).default; // Merged into admin
     const gameRoutes = (await import('./modules/game/routes.js')).default;
     const socialRoutes = (await import('./modules/social/routes.js')).default;
     const offlineRoutes = (await import('./modules/offline/routes.js')).default;
-     const integrationRoutes = (await import('./modules/integration/routes.js')).default;
-    const admobRoutes = (await import('./modules/admob/index.js')).default;
+    const admobRoutes = (await import('./modules/admob/routes.js')).default;
+    const uploadRoutes = (await import('./modules/upload/index.js')).default;
+    const arRoutes = (await import('./modules/ar/routes.js')).default;
 
     console.log('✅ Routes loaded');;
 
     // Register routes
     console.log('ðŸ“¦ Registering routes...');
-    
+
     await server.register(authRoutes, { prefix: `${apiPrefix}/auth` });
     await server.register(prizesRoutes, { prefix: `${apiPrefix}/prizes` });
     await server.register(claimsRoutes, { prefix: `${apiPrefix}/claims` });
@@ -239,12 +284,14 @@ async function registerRoutes(server: FastifyInstance): Promise<void> {
     // await server.register(partnersRoutes, { prefix: `${apiPrefix}/partners` }); // Merged into admin
     await server.register(captureRoutes, { prefix: `${apiPrefix}/capture` });
     await server.register(marketplaceRoutes, { prefix: `${apiPrefix}/marketplace` });
+    await server.register(partnerMarketplaceRoutes, { prefix: `${apiPrefix}/partner` });
     // await server.register(distributionRoutes, { prefix: `${apiPrefix}/distribution` }); // Merged into admin
     await server.register(gameRoutes, { prefix: `${apiPrefix}/game` });
     await server.register(socialRoutes, { prefix: `${apiPrefix}/social` });
     await server.register(offlineRoutes, { prefix: `${apiPrefix}/offline` });
-     await server.register(integrationRoutes, { prefix: `${apiPrefix}/integration` });
     await server.register(admobRoutes, { prefix: `${apiPrefix}/admob` });
+    await server.register(uploadRoutes, { prefix: `${apiPrefix}/upload` });
+    await server.register(arRoutes, { prefix: `${apiPrefix}/ar` });
 
     console.log('✅ Routes registered');;
 
@@ -364,7 +411,7 @@ async function start(): Promise<void> {
         socket.on('leave_room', (data: any) => socket.leave(data?.room));
         socket.on('disconnect', (reason: string) => (logger as any).info({ type: 'socketio', event: 'disconnect', id: socket.id, reason }));
       });
-      ;(server as any).io = io;
+      ; (server as any).io = io;
       // Register Socket.IO instance with websocket module for broadcasting
       setSocketIO(io);
       console.log('🔌 Socket.io initialized');
@@ -455,7 +502,7 @@ async function start(): Promise<void> {
     console.log('   - /api/v1/game');
     console.log('   - /api/v1/social');
     console.log('   - /api/v1/offline');
-    console.log('   - /api/v1/integration');
+    console.log('   - /api/v1/upload');
     console.log('   - /api/v1/admin');
     console.log('');
 

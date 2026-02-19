@@ -54,7 +54,7 @@ export default async function claimsRoutes(fastify: FastifyInstance) {
   fastify.patch('/claims/:id/validate', async (request: FastifyRequest<{ Params: { id: string } }>, reply) => {
     const { id } = request.params;
     const body = validateClaimSchema.parse(request.body);
-    const adminId = (request as any).user?.sub || (request as any).userId;
+    const adminId = request.user?.sub;
     const result = await AdminClaimsService.validateClaim(adminId, id, body.isValid, body.reason);
     return reply.send(result);
   });
@@ -89,7 +89,7 @@ export default async function claimsRoutes(fastify: FastifyInstance) {
   fastify.post('/captures/:id/validate', async (request: FastifyRequest<{ Params: { id: string } }>, reply) => {
     const { id } = request.params;
     const body = validateClaimSchema.parse(request.body);
-    const adminId = (request as any).user?.sub || (request as any).userId;
+    const adminId = request.user?.sub;
     const result = await AdminClaimsService.validateClaim(adminId, id, body.isValid, body.reason);
     return reply.send(result);
   });
@@ -98,7 +98,7 @@ export default async function claimsRoutes(fastify: FastifyInstance) {
   fastify.post('/captures/:id/reject', async (request: FastifyRequest<{ Params: { id: string } }>, reply) => {
     const { id } = request.params;
     const body = z.object({ reason: z.string().optional() }).parse(request.body);
-    const adminId = (request as any).user?.sub || (request as any).userId;
+    const adminId = request.user?.sub;
     const result = await AdminClaimsService.validateClaim(adminId, id, false, body.reason);
     return reply.send(result);
   });

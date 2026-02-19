@@ -7,6 +7,7 @@ import { UserRole } from '@/types';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { config } from '@/config';
+import { broadcastAdminEvent } from '@/lib/websocket';
 
 interface GetPartnersOptions {
   page?: number;
@@ -16,7 +17,7 @@ interface GetPartnersOptions {
   search?: string;
 }
 
-interface PartnerData {
+export interface PartnerData {
   name: string;
   description?: string;
   logo?: string;
@@ -94,7 +95,7 @@ class AdminPartnersService {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(pageSize)
-        .select('name email contactEmail contactPhone categories isActive status createdAt updatedAt locations metrics logo')
+        .select('name description email phone website contactPerson categories isActive status createdAt updatedAt locations metrics logo commissionRate features')
         .lean(),
       Partner.countDocuments(query),
     ]);
@@ -143,6 +144,7 @@ class AdminPartnersService {
         contactEmail,
         contactPhone,
         contactPerson,
+        status: 'active',
         createdBy: adminId,
         updatedBy: adminId,
       });
@@ -190,12 +192,12 @@ class AdminPartnersService {
 
   static async updatePartner(adminId: string, partnerId: string, data: Partial<PartnerData>) {
     try {
-      const updates: any = { ...data };
+      const updates: Partial<PartnerData> = { ...data };
       if (updates.contactEmail !== undefined) {
-        updates.email = (updates.contactEmail as any)?.toString().trim().toLowerCase() || undefined;
+        updates.email = updates.contactEmail?.toString().trim().toLowerCase() || undefined;
       }
       if (updates.contactPhone !== undefined) {
-        updates.phone = (updates.contactPhone as any)?.toString().trim() || undefined;
+        updates.phone = updates.contactPhone?.toString().trim() || undefined;
       }
       if (updates.contactPerson) {
         updates.contactPerson = {
@@ -300,7 +302,8 @@ class AdminPartnersService {
     if (!portalUser) {
       const targetEmail =
         partner.email?.trim().toLowerCase() ||
-        partner.contactPerson?.email?.trim().toLowerCase();
+        partner.contactPerson?.email?.trim().toLowerCase() ||
+        (partner as unknown as { contactEmail?: string }).contactEmail?.trim().toLowerCase();
 
       if (!targetEmail) {
         throw new Error('CONTACT_EMAIL_REQUIRED');
@@ -342,6 +345,95 @@ class AdminPartnersService {
       email: portalUser.email,
       password: newPassword,
     };
+  }
+
+  /**
+   * Register a new partner (self-registration, status: pending)
+   */
+  static async registerPartner(data: PartnerData) {
+    try {
+      const contactEmail = (data.contactEmail || data.email || data.contactPerson?.email || '').trim().toLowerCase() || undefined;
+      const contactPhone = (data.contactPhone || data.phone || '').trim() || undefined;
+
+      if (!contactEmail) {
+        throw new Error('CONTACT_EMAIL_REQUIRED');
+      }
+
+      // Check if partner email already exists
+      const existingPartner = await Partner.findOne({
+        $or: [
+          { email: contactEmail },
+          { contactEmail: contactEmail },
+        ]
+      });
+
+      if (existingPartner) {
+        throw new Error('PARTNER_EMAIL_ALREADY_EXISTS');
+      }
+
+      const partner = await Partner.create({
+        ...data,
+        email: contactEmail,
+        contactEmail,
+        phone: contactPhone,
+        contactPhone,
+        status: 'pending',
+        isActive: false,
+      });
+
+      // Broadcast to admins
+      broadcastAdminEvent({
+        type: 'partner_update',
+        data: {
+          type: 'new_registration',
+          partnerId: partner._id,
+          name: partner.name,
+          timestamp: new Date()
+        }
+      });
+
+      return partner;
+    } catch (error) {
+      typedLogger.error('Failed to register partner', { data, error });
+      throw error;
+    }
+  }
+
+  /**
+   * Approve a pending partner registration
+   */
+  static async approvePartner(adminId: string, partnerId: string) {
+    try {
+      const partner = await Partner.findById(partnerId);
+      if (!partner) {
+        throw new Error('Partner not found');
+      }
+
+      if (partner.status !== 'pending') {
+        throw new Error('PARTNER_NOT_PENDING');
+      }
+
+      // Update status
+      partner.status = 'active';
+      partner.isActive = true;
+      partner.updatedBy = adminId;
+      await partner.save();
+
+      // Create portal user (reusing reset logic which auto-creates if missing)
+      const credentials = await this.resetPartnerCredentials(adminId, partnerId);
+
+      await this.logAction('PARTNER_APPROVED', partner._id, adminId, {
+        portalUser: credentials.userId
+      });
+
+      return {
+        partner,
+        credentials
+      };
+    } catch (error) {
+      typedLogger.error('Failed to approve partner', { adminId, partnerId, error });
+      throw error;
+    }
   }
 }
 

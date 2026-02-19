@@ -34,7 +34,7 @@ const CreatePowerUpSchema = z.object({
     .min(1, { message: 'Max per session must be at least 1' }),
   maxInInventory: z.number()
     .min(1, { message: 'Max in inventory must be at least 1' }),
-  effects: z.record(z.any(), { message: 'Effects must be a valid object' }),
+  effects: z.record(z.unknown(), { message: 'Effects must be a valid object' }),
   notes: z.string().max(1000, { message: 'Notes cannot exceed 1000 characters' }).optional(),
 });
 
@@ -59,7 +59,7 @@ const UpdatePowerUpSchema = z.object({
     .min(1, { message: 'Max per session must be at least 1' }).optional(),
   maxInInventory: z.number()
     .min(1, { message: 'Max in inventory must be at least 1' }).optional(),
-  effects: z.record(z.any(), { message: 'Effects must be a valid object' }).optional(),
+  effects: z.record(z.unknown(), { message: 'Effects must be a valid object' }).optional(),
   enabled: z.boolean().optional(),
   notes: z.string().max(1000, { message: 'Notes cannot exceed 1000 characters' }).optional(),
 });
@@ -72,11 +72,11 @@ export default async function powerUpRoutes(fastify: FastifyInstance) {
   fastify.get(
     '/',
     { preHandler: authenticate },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request: FastifyRequest<{ Querystring: { enabled?: string; type?: string; rarity?: string } }>, reply: FastifyReply) => {
       try {
-        const { enabled, type, rarity } = request.query as any;
-        
-        const filters: any = {};
+        const { enabled, type, rarity } = request.query;
+
+        const filters: Record<string, unknown> = {};
         if (enabled !== undefined) filters.enabled = enabled === 'true';
         if (type) filters.type = type;
         if (rarity) filters.rarity = rarity;
@@ -86,7 +86,7 @@ export default async function powerUpRoutes(fastify: FastifyInstance) {
         typedLogger.info('Power-ups list retrieved', {
           count: powerUps.length,
           filters,
-          userId: (request.user as any).sub,
+          userId: request.user?.sub,
         });
 
         reply.code(200).send({
@@ -97,7 +97,7 @@ export default async function powerUpRoutes(fastify: FastifyInstance) {
       } catch (err) {
         typedLogger.error('Error fetching power-ups', {
           error: err instanceof Error ? err.message : String(err),
-          userId: (request.user as any).sub,
+          userId: request.user?.sub,
         });
         reply.code(500).send({
           success: false,
@@ -122,11 +122,11 @@ export default async function powerUpRoutes(fastify: FastifyInstance) {
           success: true,
           data: powerUp,
         });
-      } catch (error: any) {
+      } catch (error) {
         typedLogger.error('Error fetching single power-up', {
           powerUpId: request.params.id,
-          error: error.message || String(error),
-          userId: (request.user as any).sub,
+          error: error instanceof Error ? error.message : String(error),
+          userId: request.user?.sub,
         });
         reply.code(500).send({
           success: false,
@@ -190,35 +190,36 @@ export default async function powerUpRoutes(fastify: FastifyInstance) {
           data: powerUp,
           message: 'Power-up created successfully',
         });
-      } catch (error: any) {
+      } catch (error) {
+        const err = error as Error & { name?: string; errors?: Array<{ message: string }> };
         typedLogger.error('Error creating power-up via API', {
-          error: error.message || String(error),
-          adminId: (request.user as any)?.sub,
+          error: err.message || String(error),
+          adminId: request.user?.sub,
           body: request.body,
         });
-        
+
         // Handle Zod validation errors
-        if (error.name === 'ZodError') {
-          const messages = error.errors?.map((e: any) => e.message).join(', ') || 'Validation failed';
+        if (err.name === 'ZodError') {
+          const messages = err.errors?.map((e) => e.message).join(', ') || 'Validation failed';
           return reply.code(400).send({
             success: false,
             error: messages,
             code: 'VALIDATION_ERROR',
           });
         }
-        
+
         // Handle other validation errors from service
-        if (error.message?.includes('required') || error.message?.includes('must be')) {
+        if (err.message?.includes('required') || err.message?.includes('must be')) {
           return reply.code(400).send({
             success: false,
-            error: error.message,
+            error: err.message,
             code: 'VALIDATION_ERROR',
           });
         }
-        
+
         return reply.code(500).send({
           success: false,
-          error: error.message || 'Failed to create power-up',
+          error: err.message || 'Failed to create power-up',
         });
       }
     }

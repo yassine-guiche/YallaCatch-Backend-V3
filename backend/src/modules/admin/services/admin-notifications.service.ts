@@ -19,8 +19,8 @@ interface NotificationQuery {
 interface NotificationPayload {
   title: string;
   message: string;
-  type?: any;
-  data?: Record<string, any>;
+  type?: string | NotificationType;
+  data?: Record<string, unknown>;
   targetUserIds?: string[];
 }
 
@@ -46,7 +46,7 @@ export class AdminNotificationsService {
     const { page = 1, limit = 20, status, type } = query;
     const skip = (page - 1) * limit;
 
-    const filter: Record<string, any> = {};
+    const filter: Record<string, unknown> = {};
     if (status) filter.status = status;
     if (type) filter.type = type;
 
@@ -71,7 +71,7 @@ export class AdminNotificationsService {
   }
 
   static async sendNotification(adminId: string, payload: NotificationPayload) {
-    const normalizeType = (t?: any) => {
+    const normalizeType = (t?: string | NotificationType) => {
       if (!t) return NotificationType.PUSH;
       const val = (t as string).toLowerCase();
       return (Object.values(NotificationType) as string[]).includes(val) ? (val as NotificationType) : NotificationType.PUSH;
@@ -116,7 +116,7 @@ export class AdminNotificationsService {
   }
 
   static async broadcastNotification(adminId: string, payload: NotificationPayload) {
-    const normalizeType = (t?: any) => {
+    const normalizeType = (t?: string | NotificationType) => {
       if (!t) return NotificationType.PUSH;
       const val = (t as string).toLowerCase();
       return (Object.values(NotificationType) as string[]).includes(val) ? (val as NotificationType) : NotificationType.PUSH;
@@ -146,7 +146,7 @@ export class AdminNotificationsService {
   }
 
   static async scheduleNotification(adminId: string, payload: ScheduledNotificationPayload) {
-    const normalizeType = (t?: any) => {
+    const normalizeType = (t?: string | NotificationType) => {
       if (!t) return NotificationType.PUSH;
       const val = (t as string).toLowerCase();
       return (Object.values(NotificationType) as string[]).includes(val) ? (val as NotificationType) : NotificationType.PUSH;
@@ -251,7 +251,7 @@ export class AdminNotificationsService {
     ];
   }
 
-  private static async saveTemplates(templates: any[]) {
+  private static async saveTemplates(templates: Array<Record<string, unknown>>) {
     await Settings.findOneAndUpdate(
       {},
       { $set: { 'custom.notificationsTemplates': templates, updatedAt: new Date() } },
@@ -260,60 +260,60 @@ export class AdminNotificationsService {
     return templates;
   }
 
-  static async createTemplate(adminId: string, template: { id?: string; name: string; channel: string; variables?: string[]; content?: any }) {
+  static async createTemplate(adminId: string, template: { id?: string; name: string; channel: string; variables?: string[]; content?: Record<string, unknown> }) {
     const templates = await this.getTemplates();
     const id = template.id || randomUUID();
     const entry = { id, name: template.name, channel: template.channel, variables: template.variables || [], content: template.content || {} };
     const updated = [...templates, entry];
     await this.saveTemplates(updated);
-    
+
     // Audit log for template creation
     await this.logAdminAction(adminId, 'CREATE_NOTIFICATION_TEMPLATE', {
       templateId: id,
       templateName: template.name,
       channel: template.channel,
     });
-    
+
     return entry;
   }
 
-  static async updateTemplate(adminId: string, templateId: string, changes: Partial<{ name: string; channel: string; variables: string[]; content: any }>) {
+  static async updateTemplate(adminId: string, templateId: string, changes: Partial<{ name: string; channel: string; variables: string[]; content: Record<string, unknown> }>) {
     const templates = await this.getTemplates();
-    const idx = templates.findIndex((t: any) => t.id === templateId);
+    const idx = templates.findIndex((t: Record<string, unknown>) => t.id === templateId);
     if (idx === -1) throw new Error('TEMPLATE_NOT_FOUND');
     const updatedTemplate = { ...templates[idx], ...changes };
     templates[idx] = updatedTemplate;
     await this.saveTemplates(templates);
-    
+
     // Audit log for template update
     await this.logAdminAction(adminId, 'UPDATE_NOTIFICATION_TEMPLATE', {
       templateId,
       changedFields: Object.keys(changes),
     });
-    
+
     return updatedTemplate;
   }
 
   static async deleteTemplate(adminId: string, templateId: string) {
     const templates = await this.getTemplates();
-    const template = templates.find((t: any) => t.id === templateId);
-    const filtered = templates.filter((t: any) => t.id !== templateId);
+    const template = templates.find((t: Record<string, unknown>) => t.id === templateId);
+    const filtered = templates.filter((t: Record<string, unknown>) => t.id !== templateId);
     if (filtered.length === templates.length) throw new Error('TEMPLATE_NOT_FOUND');
     await this.saveTemplates(filtered);
-    
+
     // Audit log for template deletion
     await this.logAdminAction(adminId, 'DELETE_NOTIFICATION_TEMPLATE', {
       templateId,
       templateName: template?.name,
     });
-    
+
     return { success: true };
   }
 
   private static async logAdminAction(
     adminId: string,
     action: string,
-    details: Record<string, any>
+    details: Record<string, unknown>
   ): Promise<void> {
     // Use unified audit logger - writes to both Pino and MongoDB
     await audit.custom({

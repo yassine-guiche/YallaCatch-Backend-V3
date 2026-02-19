@@ -1,6 +1,10 @@
 import { redisClient } from '@/config/redis';
 import { typedLogger } from '@/lib/typed-logger';
 import { config } from '@/config';
+import { IPrize } from '@/types';
+import { IAchievement } from '@/models/Achievement';
+import { IPowerUp } from '@/models/PowerUp';
+import { IPartner } from '@/models/Partner';
 
 /**
  * Intelligent Caching Service
@@ -24,6 +28,12 @@ export interface CacheStats {
   memoryUsage: number;
 }
 
+export interface MapCacheData {
+  prizes?: IPrize[];
+  partners?: IPartner[];
+  [key: string]: unknown;
+}
+
 export class CacheService {
   private static redis = redisClient;
   // Always return a live Redis client; avoid undefined during early bootstrap
@@ -39,7 +49,7 @@ export class CacheService {
   /**
    * Get cached data with automatic deserialization
    */
-  static async get<T = any>(key: string, options: CacheOptions = {}): Promise<T | null> {
+  static async get<T = unknown>(key: string, options: CacheOptions = {}): Promise<T | null> {
     try {
       const fullKey = this.buildKey(key, options.namespace);
       const client = this.client;
@@ -73,7 +83,7 @@ export class CacheService {
 
       return data as T;
     } catch (error) {
-      typedLogger.error('Cache get error', { error: (error as any).message, key });
+      typedLogger.error('Cache get error', { error: error instanceof Error ? error.message : 'Unknown error', key });
       return null;
     }
   }
@@ -82,8 +92,8 @@ export class CacheService {
    * Set cached data with automatic serialization and compression
    */
   static async set(
-    key: string, 
-    value: any, 
+    key: string,
+    value: unknown,
     options: CacheOptions = {}
   ): Promise<boolean> {
     try {
@@ -96,11 +106,21 @@ export class CacheService {
       }
 
       // Serialize data
-      let data = options.serialize !== false ? JSON.stringify(value) : value;
+      let data: string | Buffer;
+      if (options.serialize !== false) {
+        data = JSON.stringify(value);
+      } else {
+        if (typeof value === 'string' || Buffer.isBuffer(value)) {
+          data = value;
+        } else {
+          // If not serializing, must be string or buffer
+          throw new Error('Cache value must be string or Buffer when serialize is false');
+        }
+      }
 
       // Compress large data
       if (options.compress && data.length > 1024) {
-        data = 'COMPRESSED:' + this.compress(data);
+        data = 'COMPRESSED:' + this.compress(data.toString());
       }
 
       // Set with expiration
@@ -113,7 +133,7 @@ export class CacheService {
 
       return true;
     } catch (error) {
-      typedLogger.error('Cache set error', { error: (error as any).message, key });
+      typedLogger.error('Cache set error', { error: error instanceof Error ? error.message : 'Unknown error', key });
       return false;
     }
   }
@@ -132,7 +152,7 @@ export class CacheService {
       const result = await client.del(fullKey);
       return result > 0;
     } catch (error) {
-      typedLogger.error('Cache delete error', { error: (error as any).message, key });
+      typedLogger.error('Cache delete error', { error: error instanceof Error ? error.message : 'Unknown error', key });
       return false;
     }
   }
@@ -140,7 +160,7 @@ export class CacheService {
   /**
    * Get or set pattern - fetch from cache or execute function and cache result
    */
-  static async getOrSet<T = any>(
+  static async getOrSet<T = unknown>(
     key: string,
     fetchFunction: () => Promise<T>,
     options: CacheOptions = {}
@@ -154,13 +174,13 @@ export class CacheService {
 
       // Execute fetch function
       const data = await fetchFunction();
-      
+
       // Cache the result
       await this.set(key, data, options);
-      
+
       return data;
     } catch (error) {
-      typedLogger.error('Cache getOrSet error', { error: (error as any).message, key });
+      typedLogger.error('Cache getOrSet error', { error: error instanceof Error ? error.message : 'Unknown error', key });
       throw error;
     }
   }
@@ -180,12 +200,12 @@ export class CacheService {
       for (const tag of tags) {
         const tagKey = `tag:${tag}`;
         const keys = await client.smembers(tagKey);
-        
+
         if (keys.length > 0) {
           // Delete all keys with this tag
           const deleted = await client.del(...keys);
           deletedCount += deleted;
-          
+
           // Remove the tag set
           await client.del(tagKey);
         }
@@ -194,7 +214,7 @@ export class CacheService {
       typedLogger.info('Cache invalidated by tags', { tags, deletedCount });
       return deletedCount;
     } catch (error) {
-      typedLogger.error('Cache invalidate by tags error', { error: (error as any).message, tags });
+      typedLogger.error('Cache invalidate by tags error', { error: error instanceof Error ? error.message : 'Unknown error', tags });
       return 0;
     }
   }
@@ -211,7 +231,7 @@ export class CacheService {
         return 0;
       }
       const keys = await client.keys(fullPattern);
-      
+
       if (keys.length === 0) {
         return 0;
       }
@@ -220,7 +240,7 @@ export class CacheService {
       typedLogger.info('Cache invalidated by pattern', { pattern: fullPattern, deletedCount: deleted });
       return deleted;
     } catch (error) {
-      typedLogger.error('Cache invalidate by pattern error', { error: (error as any).message, pattern });
+      typedLogger.error('Cache invalidate by pattern error', { error: error instanceof Error ? error.message : 'Unknown error', pattern });
       return 0;
     }
   }
@@ -230,12 +250,12 @@ export class CacheService {
    */
   static async cacheMapData(
     bounds: { north: number; south: number; east: number; west: number },
-    data: any,
+    data: MapCacheData,
     ttl: number = 300 // 5 minutes for map data
   ): Promise<void> {
     try {
       const key = `map:${bounds.north}_${bounds.south}_${bounds.east}_${bounds.west}`;
-      
+
       await this.set(key, {
         bounds,
         data,
@@ -256,21 +276,21 @@ export class CacheService {
         }
       }
     } catch (error) {
-      typedLogger.error('Cache map data error', { error: (error as any).message, bounds });
+      typedLogger.error('Cache map data error', { error: error instanceof Error ? error.message : 'Unknown error', bounds });
     }
   }
 
   /**
    * Cache user session data for Unity
    */
-  static async cacheUserSession(userId: string, sessionData: any): Promise<void> {
+  static async cacheUserSession(userId: string, sessionData: Record<string, unknown>): Promise<void> {
     try {
       await this.set(`user_session:${userId}`, sessionData, {
         ttl: 3600, // 1 hour
         tags: ['user_sessions', 'unity'],
       });
     } catch (error) {
-      typedLogger.error('Cache user session error', { error: (error as any).message, userId });
+      typedLogger.error('Cache user session error', { error: error instanceof Error ? error.message : 'Unknown error', userId });
     }
   }
 
@@ -279,7 +299,7 @@ export class CacheService {
    */
   static async cacheLeaderboard(
     type: string,
-    data: any,
+    data: unknown,
     ttl: number = 300 // 5 minutes
   ): Promise<void> {
     try {
@@ -292,7 +312,7 @@ export class CacheService {
         compress: true,
       });
     } catch (error) {
-      typedLogger.error('Cache leaderboard error', { error: (error as any).message, type });
+      typedLogger.error('Cache leaderboard error', { error: error instanceof Error ? error.message : 'Unknown error', type });
     }
   }
 
@@ -312,10 +332,10 @@ export class CacheService {
       ];
 
       await Promise.allSettled(warmupTasks);
-      
+
       typedLogger.info('Cache warmup completed');
     } catch (error) {
-      typedLogger.error('Cache warmup error', { error: (error as any).message });
+      typedLogger.error('Cache warmup error', { error: error instanceof Error ? error.message : 'Unknown error' });
     }
   }
 
@@ -337,7 +357,7 @@ export class CacheService {
       }
       const info = await client.info('memory');
       const keyspace = await client.info('keyspace');
-      
+
       // Parse memory usage
       const memoryMatch = info.match(/used_memory:(\d+)/);
       const memoryUsage = memoryMatch ? parseInt(memoryMatch[1]) : 0;
@@ -357,7 +377,7 @@ export class CacheService {
         memoryUsage,
       };
     } catch (error) {
-      typedLogger.error('Get cache stats error', { error: (error as any).message });
+      typedLogger.error('Get cache stats error', { error: error instanceof Error ? error.message : 'Unknown error' });
       return {
         hits: this.stats.hits,
         misses: this.stats.misses,
@@ -384,7 +404,7 @@ export class CacheService {
       typedLogger.info('All cache cleared');
       return true;
     } catch (error) {
-      typedLogger.error('Clear all cache error', { error: (error as any).message });
+      typedLogger.error('Clear all cache error', { error: error instanceof Error ? error.message : 'Unknown error' });
       return false;
     }
   }
@@ -392,12 +412,12 @@ export class CacheService {
   /**
    * Unity-specific cache methods
    */
-  
+
   // Cache nearby prizes for Unity
   static async cacheNearbyPrizes(
     location: { lat: number; lng: number },
     radius: number,
-    prizes: any[]
+    prizes: IPrize[]
   ): Promise<void> {
     const key = `nearby_prizes:${location.lat}_${location.lng}_${radius}`;
     await this.set(key, prizes, {
@@ -407,7 +427,7 @@ export class CacheService {
   }
 
   // Cache user achievements for Unity
-  static async cacheUserAchievements(userId: string, achievements: any[]): Promise<void> {
+  static async cacheUserAchievements(userId: string, achievements: IAchievement[]): Promise<void> {
     await this.set(`achievements:${userId}`, achievements, {
       ttl: 1800, // 30 minutes
       tags: ['achievements', 'unity', `user:${userId}`],
@@ -415,7 +435,7 @@ export class CacheService {
   }
 
   // Cache power-ups for Unity
-  static async cachePowerUps(userId: string, powerUps: any[]): Promise<void> {
+  static async cachePowerUps(userId: string, powerUps: IPowerUp[]): Promise<void> {
     await this.set(`powerups:${userId}`, powerUps, {
       ttl: 600, // 10 minutes
       tags: ['powerups', 'unity', `user:${userId}`],
@@ -423,7 +443,7 @@ export class CacheService {
   }
 
   // Cache daily challenges for Unity
-  static async cacheDailyChallenges(userId: string, challenges: any[]): Promise<void> {
+  static async cacheDailyChallenges(userId: string, challenges: Record<string, unknown>[]): Promise<void> {
     await this.set(`daily_challenges:${userId}`, challenges, {
       ttl: 3600, // 1 hour
       tags: ['challenges', 'unity', `user:${userId}`],
@@ -445,7 +465,7 @@ export class CacheService {
         await this.redis.expire(tagKey, ttl + 60); // Tag expires slightly later
       }
     } catch (error) {
-      typedLogger.error('Add to tags error', { error: (error as any).message, key, tags });
+      typedLogger.error('Add to tags error', { error: error instanceof Error ? error.message : 'Unknown error', key, tags });
     }
   }
 
@@ -478,25 +498,25 @@ export class CacheService {
           east: city.lng + 0.05,
           west: city.lng - 0.05,
         };
-        
+
         // This would typically call the actual map data service
         await this.cacheMapData(bounds, { prizes: [], partners: [] }, 1800);
       }
     } catch (error) {
-      typedLogger.error('Warmup map data error', { error: (error as any).message });
+      typedLogger.error('Warmup map data error', { error: error instanceof Error ? error.message : 'Unknown error' });
     }
   }
 
   private static async warmupLeaderboards(): Promise<void> {
     try {
       const leaderboardTypes = ['points', 'claims', 'distance', 'level'];
-      
+
       for (const type of leaderboardTypes) {
         // This would typically call the actual leaderboard service
         await this.cacheLeaderboard(type, [], 600);
       }
     } catch (error) {
-      typedLogger.error('Warmup leaderboards error', { error: (error as any).message });
+      typedLogger.error('Warmup leaderboards error', { error: error instanceof Error ? error.message : 'Unknown error' });
     }
   }
 
@@ -508,7 +528,7 @@ export class CacheService {
         tags: ['settings'],
       });
     } catch (error) {
-      typedLogger.error('Warmup settings error', { error: (error as any).message });
+      typedLogger.error('Warmup settings error', { error: error instanceof Error ? error.message : 'Unknown error' });
     }
   }
 
@@ -520,13 +540,15 @@ export class CacheService {
         tags: ['partners'],
       });
     } catch (error) {
-      typedLogger.error('Warmup partners error', { error: (error as any).message });
+      typedLogger.error('Warmup partners error', { error: error instanceof Error ? error.message : 'Unknown error' });
     }
   }
 }
 
 // Allow Redis initialization to be injected after connect to avoid circular imports
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function setCacheClient(client: any) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (CacheService as any).redis = client;
 }
 
@@ -534,12 +556,14 @@ export function setCacheClient(client: any) {
  * Cache decorators for automatic caching
  */
 export function Cacheable(options: CacheOptions = {}) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
     const originalMethod = descriptor.value;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     descriptor.value = async function (...args: any[]) {
       const cacheKey = `${target.constructor.name}:${propertyKey}:${JSON.stringify(args)}`;
-      
+
       return await CacheService.getOrSet(
         cacheKey,
         () => originalMethod.apply(this, args),

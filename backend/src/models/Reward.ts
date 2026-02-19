@@ -1,5 +1,5 @@
 import { Schema, model, Model, Types } from 'mongoose';
-import { IReward, RewardCategory } from '@/types';
+import { IReward, IRewardModel, RewardCategory, ListingType } from '@/types';
 import { logger } from '@/lib/logger';
 
 const rewardSchema = new Schema<IReward>({
@@ -27,7 +27,7 @@ const rewardSchema = new Schema<IReward>({
     type: Number,
     required: true,
     min: 1,
-    max: 100000,
+    max: 1000000,
     index: true,
   },
   stockQuantity: {
@@ -48,8 +48,9 @@ const rewardSchema = new Schema<IReward>({
   imageUrl: {
     type: String,
     validate: {
-      validator: function(url: string) {
-        return !url || /^https?:\/\/.+/.test(url);
+      validator: function (url: string) {
+        // Accept URLs, upload paths, or empty strings
+        return !url || url.startsWith('/uploads/') || /^https?:\/\/.+/.test(url);
       },
       message: 'Invalid image URL format'
     }
@@ -62,6 +63,26 @@ const rewardSchema = new Schema<IReward>({
   isPopular: {
     type: Boolean,
     default: false,
+    index: true,
+  },
+  // Approval status for partner-submitted items
+  approvalStatus: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'approved', // Admin-created items are auto-approved
+    index: true,
+  },
+  approvedBy: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  approvedAt: {
+    type: Date,
+  },
+  listingType: {
+    type: String,
+    enum: Object.values(ListingType),
+    default: ListingType.GAME_REWARD,
     index: true,
   },
   partnerId: {
@@ -92,95 +113,95 @@ rewardSchema.index({ name: 'text', description: 'text' });
 rewardSchema.index({ 'metadata.isSponsored': 1, isActive: 1, createdAt: -1 });
 
 // Virtual fields
-rewardSchema.virtual('isAvailable').get(function() {
+rewardSchema.virtual('isAvailable').get(function () {
   return this.isActive && this.stockAvailable > 0;
 });
 
-rewardSchema.virtual('stockUsed').get(function() {
+rewardSchema.virtual('stockUsed').get(function () {
   return this.stockQuantity - this.stockAvailable - this.stockReserved;
 });
 
-rewardSchema.virtual('popularityScore').get(function() {
+rewardSchema.virtual('popularityScore').get(function () {
   // Simple popularity calculation based on stock usage
   if (this.stockQuantity === 0) return 0;
   return ((this as any).stockUsed / this.stockQuantity) * 100;
 });
 
 // Pre-save middleware
-rewardSchema.pre('save', function(next) {
+rewardSchema.pre('save', function (next) {
   // Ensure stock consistency
   if (this.stockReserved + this.stockAvailable > this.stockQuantity) {
     this.stockAvailable = Math.max(0, this.stockQuantity - this.stockReserved);
   }
-  
+
   next();
 });
 
 // Instance methods
-rewardSchema.methods.reserveStock = function(quantity: number = 1): boolean {
+rewardSchema.methods.reserveStock = function (quantity: number = 1): boolean {
   if (this.stockAvailable < quantity) {
     return false;
   }
-  
+
   this.stockAvailable -= quantity;
   this.stockReserved += quantity;
   return true;
 };
 
-rewardSchema.methods.releaseReservation = function(quantity: number = 1): void {
+rewardSchema.methods.releaseReservation = function (quantity: number = 1): void {
   const toRelease = Math.min(quantity, this.stockReserved);
   this.stockReserved -= toRelease;
   this.stockAvailable += toRelease;
 };
 
-rewardSchema.methods.confirmRedemption = function(quantity: number = 1): boolean {
+rewardSchema.methods.confirmRedemption = function (quantity: number = 1): boolean {
   if (this.stockReserved < quantity) {
     return false;
   }
-  
+
   this.stockReserved -= quantity;
   return true;
 };
 
-rewardSchema.methods.addStock = function(quantity: number): void {
+rewardSchema.methods.addStock = function (quantity: number): void {
   this.stockQuantity += quantity;
   this.stockAvailable += quantity;
 };
 
-rewardSchema.methods.activate = function(): void {
+rewardSchema.methods.activate = function (): void {
   this.isActive = true;
 };
 
-rewardSchema.methods.deactivate = function(): void {
+rewardSchema.methods.deactivate = function (): void {
   this.isActive = false;
 };
 
 // Static methods
-rewardSchema.statics.findAvailable = function(options: any = {}) {
+rewardSchema.statics.findAvailable = function (options: any = {}) {
   const query: any = {
     isActive: true,
     stockAvailable: { $gt: 0 },
   };
-  
+
   if (options.category) {
     query.category = options.category;
   }
-  
+
   if (options.maxCost) {
     query.pointsCost = { $lte: options.maxCost };
   }
-  
+
   if (options.minCost) {
     query.pointsCost = { ...query.pointsCost, $gte: options.minCost };
   }
-  
+
   return this.find(query)
     .populate('partnerId', 'name logoUrl')
     .sort(options.sort || { pointsCost: 1 })
     .limit(options.limit || 50);
 };
 
-rewardSchema.statics.findPopular = function(limit: number = 10) {
+rewardSchema.statics.findPopular = function (limit: number = 10) {
   return this.find({
     isActive: true,
     stockAvailable: { $gt: 0 },
@@ -191,7 +212,7 @@ rewardSchema.statics.findPopular = function(limit: number = 10) {
     .limit(limit);
 };
 
-rewardSchema.statics.findByCategory = function(category: RewardCategory, options: any = {}) {
+rewardSchema.statics.findByCategory = function (category: RewardCategory, options: any = {}) {
   return this.find({
     category,
     isActive: true,
@@ -202,7 +223,7 @@ rewardSchema.statics.findByCategory = function(category: RewardCategory, options
     .limit(options.limit || 50);
 };
 
-rewardSchema.statics.searchRewards = function(query: string, options: any = {}) {
+rewardSchema.statics.searchRewards = function (query: string, options: any = {}) {
   return this.find({
     $text: { $search: query },
     isActive: true,
@@ -213,7 +234,7 @@ rewardSchema.statics.searchRewards = function(query: string, options: any = {}) 
     .limit(options.limit || 20);
 };
 
-rewardSchema.statics.getStats = async function() {
+rewardSchema.statics.getStats = async function () {
   const stats = await this.aggregate([
     {
       $group: {
@@ -230,7 +251,7 @@ rewardSchema.statics.getStats = async function() {
       }
     }
   ]);
-  
+
   return stats[0] || {
     totalRewards: 0,
     activeRewards: 0,
@@ -242,7 +263,7 @@ rewardSchema.statics.getStats = async function() {
   };
 };
 
-rewardSchema.statics.getLowStockRewards = function(threshold: number = 10) {
+rewardSchema.statics.getLowStockRewards = function (threshold: number = 10) {
   return this.find({
     isActive: true,
     stockAvailable: { $lte: threshold, $gt: 0 },
@@ -251,5 +272,56 @@ rewardSchema.statics.getLowStockRewards = function(threshold: number = 10) {
     .sort({ stockAvailable: 1 });
 };
 
-export const Reward: Model<IReward> = model<IReward>('Reward', rewardSchema);
+/**
+ * ATOMIC OPERATIONS FOR CONCURRENCY SAFETY
+ */
+rewardSchema.statics.atomicReserveStock = async function (rewardId: string | Types.ObjectId, quantity: number = 1) {
+  return this.findOneAndUpdate(
+    {
+      _id: rewardId,
+      isActive: true,
+      stockAvailable: { $gte: quantity }
+    },
+    {
+      $inc: {
+        stockAvailable: -quantity,
+        stockReserved: quantity
+      }
+    },
+    { new: true }
+  );
+};
+
+rewardSchema.statics.atomicConfirmRedemption = async function (rewardId: string | Types.ObjectId, quantity: number = 1) {
+  return this.findOneAndUpdate(
+    {
+      _id: rewardId,
+      stockReserved: { $gte: quantity }
+    },
+    {
+      $inc: {
+        stockReserved: -quantity
+      }
+    },
+    { new: true }
+  );
+};
+
+rewardSchema.statics.atomicReleaseReservation = async function (rewardId: string | Types.ObjectId, quantity: number = 1) {
+  return this.findOneAndUpdate(
+    {
+      _id: rewardId,
+      stockReserved: { $gte: quantity }
+    },
+    {
+      $inc: {
+        stockAvailable: quantity,
+        stockReserved: -quantity
+      }
+    },
+    { new: true }
+  );
+};
+
+export const Reward = model<IReward, IRewardModel>('Reward', rewardSchema);
 export default Reward;

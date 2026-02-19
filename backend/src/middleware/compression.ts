@@ -66,40 +66,40 @@ function shouldCompress(request: FastifyRequest, reply: FastifyReply): boolean {
   if (!acceptEncoding) {
     return false;
   }
-  
+
   // Get content type
   const contentType = reply.getHeader('content-type') as string;
   if (!contentType) {
     return false;
   }
-  
+
   // Check if content type is compressible
-  const isCompressible = compressibleTypes.some(type => 
+  const isCompressible = compressibleTypes.some(type =>
     contentType.toLowerCase().includes(type)
   );
-  
+
   if (!isCompressible) {
     return false;
   }
-  
+
   // Don't compress already compressed content
   const contentEncoding = reply.getHeader('content-encoding');
   if (contentEncoding) {
     return false;
   }
-  
+
   // Don't compress small responses
   const contentLength = reply.getHeader('content-length');
   if (contentLength && parseInt(contentLength as string) < (defaultOptions.threshold || 1024)) {
     return false;
   }
-  
+
   // Don't compress if cache-control says no-transform
   const cacheControl = reply.getHeader('cache-control') as string;
   if (cacheControl && cacheControl.includes('no-transform')) {
     return false;
   }
-  
+
   return true;
 }
 
@@ -108,22 +108,22 @@ function shouldCompress(request: FastifyRequest, reply: FastifyReply): boolean {
  */
 function getBestEncoding(acceptEncoding: string): string | null {
   const encodings = acceptEncoding.toLowerCase().split(',').map(e => e.trim());
-  
+
   // Prefer brotli if available
   if (encodings.some(e => e.includes('br'))) {
     return 'br';
   }
-  
+
   // Then gzip
   if (encodings.some(e => e.includes('gzip'))) {
     return 'gzip';
   }
-  
+
   // Finally deflate
   if (encodings.some(e => e.includes('deflate'))) {
     return 'deflate';
   }
-  
+
   return null;
 }
 
@@ -138,7 +138,7 @@ function createCompressionStream(encoding: string, options: CompressionOptions):
     memLevel: options.memLevel,
     strategy: options.strategy,
   };
-  
+
   switch (encoding) {
     case 'gzip':
       return zlib.createGzip(zlibOptions);
@@ -166,55 +166,55 @@ export async function compression(
   options: CompressionOptions = {}
 ): Promise<any> {
   const opts = { ...defaultOptions, ...options };
-  
+
   // Skip compression if disabled
   if (config.COMPRESSION_ENABLED === false) {
     return payload;
   }
-  
+
   // Skip if filter says no
   if (opts.filter && !opts.filter(request, reply)) {
     return payload;
   }
-  
+
   // Skip if no payload or payload is not string/buffer
   if (!payload || (typeof payload !== 'string' && !Buffer.isBuffer(payload))) {
     return payload;
   }
-  
+
   // Skip if payload is too small
   const payloadSize = Buffer.isBuffer(payload) ? payload.length : Buffer.byteLength(payload);
   if (payloadSize < (opts.threshold || 1024)) {
     return payload;
   }
-  
+
   // Get client's accepted encodings
   const acceptEncoding = request.headers['accept-encoding'] as string;
   if (!acceptEncoding) {
     return payload;
   }
-  
+
   // Determine best encoding
   const encoding = getBestEncoding(acceptEncoding);
   if (!encoding) {
     return payload;
   }
-  
+
   try {
     // Create compression stream
     const compressionStream = createCompressionStream(encoding, opts);
-    
+
     // Convert payload to buffer if needed
     const buffer = Buffer.isBuffer(payload) ? payload : Buffer.from(payload);
-    
+
     // Compress the data
     const compressed = await compressBuffer(buffer, compressionStream);
-    
-    // Set compression headers
+
+    // Set compression headers safely
     reply.header('Content-Encoding', encoding);
     reply.header('Content-Length', compressed.length);
     reply.removeHeader('content-length'); // Remove original content-length
-    
+
     // Add vary header for caching
     const varyHeader = reply.getHeader('vary') as string;
     if (varyHeader) {
@@ -224,10 +224,10 @@ export async function compression(
     } else {
       reply.header('Vary', 'Accept-Encoding');
     }
-    
+
     // Log compression stats
     const compressionRatio = ((buffer.length - compressed.length) / buffer.length * 100).toFixed(1);
-    
+
     typedLogger.debug('Response compressed', {
       encoding,
       originalSize: buffer.length,
@@ -235,9 +235,9 @@ export async function compression(
       compressionRatio: `${compressionRatio}%`,
       url: request.url,
     });
-    
+
     return compressed;
-    
+
   } catch (error) {
     typedLogger.error('Compression failed', {
       error: (error as any).message,
@@ -245,7 +245,7 @@ export async function compression(
       payloadSize,
       url: request.url,
     });
-    
+
     // Return original payload if compression fails
     return payload;
   }
@@ -257,19 +257,19 @@ export async function compression(
 function compressBuffer(buffer: Buffer, compressionStream: NodeJS.ReadWriteStream): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    
+
     compressionStream.on('data', (chunk) => {
       chunks.push(chunk);
     });
-    
+
     compressionStream.on('end', () => {
       resolve(Buffer.concat(chunks));
     });
-    
+
     compressionStream.on('error', (error) => {
       reject(error);
     });
-    
+
     compressionStream.write(buffer);
     compressionStream.end();
   });
@@ -319,12 +319,12 @@ export const adaptiveCompression = createCompressionMiddleware({
     if (!shouldCompress(request, reply)) {
       return false;
     }
-    
+
     // Adjust compression level based on response size
     const contentLength = reply.getHeader('content-length');
     if (contentLength) {
       const size = parseInt(contentLength as string);
-      
+
       // Use higher compression for larger responses
       if (size > 100 * 1024) { // > 100KB
         (defaultOptions as any).level = 9;
@@ -334,7 +334,7 @@ export const adaptiveCompression = createCompressionMiddleware({
         (defaultOptions as any).level = 3;
       }
     }
-    
+
     return true;
   },
 });
@@ -359,14 +359,14 @@ export async function precompressStaticFiles(filePath: string): Promise<void> {
   // This would be used in a build step to pre-compress static files
   const fs = await import('fs');
   const path = await import('path');
-  
+
   try {
     const content = await fs.promises.readFile(filePath);
-    
+
     // Create gzip version
     const gzipped = await compressBuffer(content, zlib.createGzip({ level: 9 }));
     await fs.promises.writeFile(`${filePath}.gz`, gzipped);
-    
+
     // Create brotli version if available
     if (zlib.createBrotliCompress) {
       const brotli = await compressBuffer(content, zlib.createBrotliCompress({
@@ -376,13 +376,13 @@ export async function precompressStaticFiles(filePath: string): Promise<void> {
       }));
       await fs.promises.writeFile(`${filePath}.br`, brotli);
     }
-    
+
     typedLogger.info('Static file pre-compressed', {
       file: path.basename(filePath),
       originalSize: content.length,
       gzipSize: gzipped.length,
     });
-    
+
   } catch (error) {
     typedLogger.error('Failed to pre-compress static file', {
       file: filePath,

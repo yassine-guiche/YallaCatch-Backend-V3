@@ -26,6 +26,10 @@ interface DashboardStats {
   redemptions: { total: number; pending: number; completed: number };
 }
 
+interface AggregationResult {
+  [key: string]: { count: number }[];
+}
+
 export class AdminService {
   static async getDashboardStats(): Promise<DashboardStats> {
     try {
@@ -80,7 +84,7 @@ export class AdminService {
         ]),
       ]);
 
-      const extractCount = (result: any[], key: string): number =>
+      const extractCount = (result: AggregationResult[], key: string): number =>
         result[0]?.[key]?.[0]?.count ?? 0;
 
       return {
@@ -120,7 +124,7 @@ export class AdminService {
     try {
       const { page = 1, limit = 20, adminId, action, resource, startDate, endDate } = options;
 
-      const filter: Record<string, any> = {};
+      const filter: Record<string, unknown> = {};
 
       // AuditLog schema uses userId, not adminId
       if (adminId) {
@@ -133,9 +137,10 @@ export class AdminService {
         filter.resource = resource;
       }
       if (startDate || endDate) {
-        filter.createdAt = {};
-        if (startDate) filter.createdAt.$gte = startDate;
-        if (endDate) filter.createdAt.$lte = endDate;
+        const dateFilter: Record<string, Date> = {};
+        if (startDate) dateFilter.$gte = startDate;
+        if (endDate) dateFilter.$lte = endDate;
+        filter.createdAt = dateFilter;
       }
 
       const skip = (page - 1) * limit;
@@ -174,9 +179,9 @@ export class AdminService {
     action: string,
     resource: string,
     resourceId?: string | Types.ObjectId,
-    metadata?: Record<string, any>,
-    ip?: string,
-    userAgent?: string
+    metadata?: Record<string, unknown>,
+    _ip?: string,
+    _userAgent?: string
   ) {
     // Delegate to the unified audit logger
     return audit.custom(adminId.toString(), action, resource, resourceId?.toString(), metadata);

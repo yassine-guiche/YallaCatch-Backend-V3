@@ -1,4 +1,4 @@
-import { Schema, model, Model } from 'mongoose';
+import { Schema, model, Model, Types } from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { IUser, IDevice, IUserModel, IUserMethods, IUserVirtuals, UserRole, UserLevel, Platform, Language, Theme, AchievementTrigger } from '@/types';
 import { config } from '@/config';
@@ -6,17 +6,17 @@ import { typedLogger } from '@/lib/typed-logger';
 
 // Device subdocument schema
 const deviceSchema = new Schema<IDevice>({
-  deviceId: { 
-    type: String, 
+  deviceId: {
+    type: String,
     required: true,
     index: true,
   },
-  platform: { 
-    type: String, 
-    enum: Object.values(Platform), 
-    required: true 
+  platform: {
+    type: String,
+    enum: Object.values(Platform),
+    required: true
   },
-  fcmToken: { 
+  fcmToken: {
     type: String,
     sparse: true,
   },
@@ -24,45 +24,45 @@ const deviceSchema = new Schema<IDevice>({
   osVersion: { type: String },
   appVersion: { type: String },
   userAgent: { type: String },
-  lastUsed: { 
-    type: Date, 
-    default: Date.now 
+  lastUsed: {
+    type: Date,
+    default: Date.now
   },
-  isActive: { 
-    type: Boolean, 
-    default: true 
+  isActive: {
+    type: Boolean,
+    default: true
   },
 }, { _id: false });
 
 // Main user schema
 const userSchema = new Schema<IUser, IUserModel, IUserMethods, {}, IUserVirtuals>({
-  email: { 
-    type: String, 
-    unique: true, 
+  email: {
+    type: String,
+    unique: true,
     sparse: true,
     lowercase: true,
     trim: true,
     validate: {
-      validator: function(email: string) {
+      validator: function (email: string) {
         return !email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
       },
       message: 'Invalid email format'
     }
   },
-  passwordHash: { 
+  passwordHash: {
     type: String,
     select: false, // Don't include in queries by default
   },
-  displayName: { 
-    type: String, 
+  displayName: {
+    type: String,
     required: true,
     trim: true,
     minlength: 2,
     maxlength: 50,
   },
-  role: { 
-    type: String, 
-    enum: Object.values(UserRole), 
+  role: {
+    type: String,
+    enum: Object.values(UserRole),
     default: UserRole.PLAYER,
     index: true,
   },
@@ -72,107 +72,120 @@ const userSchema = new Schema<IUser, IUserModel, IUserMethods, {}, IUserVirtuals
     index: true,
     required: false,
   },
+  referralCode: {
+    type: String,
+    unique: true,
+    sparse: true,
+    index: true,
+    trim: true,
+    uppercase: true,
+  },
+  referredBy: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    index: true,
+  },
   points: {
-    available: { 
-      type: Number, 
+    available: {
+      type: Number,
       default: 0,
       min: 0,
     },
-    total: { 
-      type: Number, 
+    total: {
+      type: Number,
       default: 0,
       min: 0,
       index: true, // For leaderboards
     },
-    spent: { 
-      type: Number, 
+    spent: {
+      type: Number,
       default: 0,
       min: 0,
     },
   },
-  level: { 
-    type: String, 
-    enum: Object.values(UserLevel), 
+  level: {
+    type: String,
+    enum: Object.values(UserLevel),
     default: UserLevel.BRONZE,
     index: true,
   },
   location: {
-    lat: { 
+    lat: {
       type: Number,
       min: -90,
       max: 90,
     },
-    lng: { 
+    lng: {
       type: Number,
       min: -180,
       max: 180,
     },
-    city: { 
+    city: {
       type: String,
       index: true,
     },
-    lastUpdated: { 
-      type: Date 
+    lastUpdated: {
+      type: Date
     },
   },
   stats: {
-    prizesFound: { 
-      type: Number, 
+    prizesFound: {
+      type: Number,
       default: 0,
       min: 0,
     },
-    rewardsRedeemed: { 
-      type: Number, 
+    rewardsRedeemed: {
+      type: Number,
       default: 0,
       min: 0,
     },
-    sessionsCount: { 
-      type: Number, 
+    sessionsCount: {
+      type: Number,
       default: 0,
       min: 0,
     },
-    totalPlayTime: { 
-      type: Number, 
+    totalPlayTime: {
+      type: Number,
       default: 0,
       min: 0, // in seconds
     },
-    longestStreak: { 
-      type: Number, 
+    longestStreak: {
+      type: Number,
       default: 0,
       min: 0,
     },
-    currentStreak: { 
-      type: Number, 
+    currentStreak: {
+      type: Number,
       default: 0,
       min: 0,
     },
-    favoriteCity: { 
-      type: String 
+    favoriteCity: {
+      type: String
     },
-    lastClaimDate: { 
-      type: Date 
+    lastClaimDate: {
+      type: Date
     },
-    dailyClaimsCount: { 
-      type: Number, 
+    dailyClaimsCount: {
+      type: Number,
       default: 0,
       min: 0,
     },
   },
   devices: [deviceSchema],
   preferences: {
-    notifications: { 
-      type: Boolean, 
-      default: true 
+    notifications: {
+      type: Boolean,
+      default: true
     },
-    language: { 
-      type: String, 
-      enum: Object.values(Language), 
-      default: Language.FR 
+    language: {
+      type: String,
+      enum: Object.values(Language),
+      default: Language.FR
     },
-    theme: { 
-      type: String, 
-      enum: Object.values(Theme), 
-      default: Theme.LIGHT 
+    theme: {
+      type: String,
+      enum: Object.values(Theme),
+      default: Theme.LIGHT
     },
   },
   isGuest: {
@@ -238,11 +251,15 @@ const userSchema = new Schema<IUser, IUserModel, IUserMethods, {}, IUserVirtuals
     type: Date,
     index: true,
   },
+  favorites: [{
+    type: Schema.Types.ObjectId,
+    ref: 'Reward',
+  }],
 }, {
   timestamps: true,
   toJSON: {
     virtuals: true,
-    transform: function(doc, ret) {
+    transform: function (doc, ret) {
       delete ret.passwordHash;
       delete ret.__v;
       return ret;
@@ -250,7 +267,7 @@ const userSchema = new Schema<IUser, IUserModel, IUserMethods, {}, IUserVirtuals
   },
   toObject: {
     virtuals: true,
-    transform: function(doc, ret) {
+    transform: function (doc, ret) {
       delete ret.passwordHash;
       delete ret.__v;
       return ret;
@@ -264,12 +281,12 @@ userSchema.index({ 'location.city': 1, level: 1 });
 userSchema.index({ isBanned: 1, deletedAt: 1 });
 
 // Virtual fields
-userSchema.virtual('isActive').get(function() {
+userSchema.virtual('isActive').get(function () {
   const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   return this.lastActive > oneWeekAgo;
 });
 
-userSchema.virtual('levelProgress').get(function() {
+userSchema.virtual('levelProgress').get(function () {
   const levelRequirements = {
     [UserLevel.BRONZE]: 0,
     [UserLevel.SILVER]: 1000,
@@ -277,77 +294,79 @@ userSchema.virtual('levelProgress').get(function() {
     [UserLevel.PLATINUM]: 15000,
     [UserLevel.DIAMOND]: 50000,
   };
-  
+
   const currentRequirement = levelRequirements[this.level];
   const nextLevel = Object.values(UserLevel)[Object.values(UserLevel).indexOf(this.level) + 1];
   const nextRequirement = nextLevel ? levelRequirements[nextLevel] : null;
-  
+
   if (!nextRequirement) {
-    return { 
-      progress: 100, 
-      pointsToNext: 0, 
+    return {
+      progress: 100,
+      pointsToNext: 0,
       nextLevel: null,
       currentLevel: this.level,
       pointsForNext: 0
     };
   }
-  
+
   const progress = Math.min(100, ((this.points.total - currentRequirement) / (nextRequirement - currentRequirement)) * 100);
   const pointsToNext = Math.max(0, nextRequirement - this.points.total);
-  
-  return { 
-    progress, 
-    pointsToNext, 
+
+  return {
+    progress,
+    pointsToNext,
     nextLevel,
     currentLevel: this.level,
     pointsForNext: pointsToNext
   };
 });
 
-userSchema.virtual('activeDevice').get(function() {
+userSchema.virtual('activeDevice').get(function () {
   if (!this.devices || !Array.isArray(this.devices)) return null;
   return this.devices.find(device => device.isActive) || this.devices[0];
 });
 
 // isGuest is a real field in the schema, not a virtual
 
-userSchema.virtual('canClaim').get(function() {
+userSchema.virtual('canClaim').get(function () {
   if (this.isBanned) return false;
   if (this.deletedAt) return false;
-  
+
   // Check daily limit
   const today = new Date();
   const lastClaim = this.stats.lastClaimDate;
-  
-  if (lastClaim && 
-      lastClaim.toDateString() === today.toDateString() && 
-      this.stats.dailyClaimsCount >= config.GAME_MAX_DAILY_CLAIMS) {
+
+  if (lastClaim &&
+    lastClaim.toDateString() === today.toDateString() &&
+    this.stats.dailyClaimsCount >= config.GAME_MAX_DAILY_CLAIMS) {
     return false;
   }
-  
+
   return true;
 });
 
 // Pre-save middleware for password hashing
-userSchema.pre('save', async function(next) {
+userSchema.pre('save', async function (next) {
   try {
     // Hash password if modified
     if (this.isModified('passwordHash') && this.passwordHash) {
-      // Use bcrypt everywhere for portability across environments
-      this.passwordHash = await bcrypt.hash(this.passwordHash, config.BCRYPT_ROUNDS);
+      // Avoid double hashing if already looks like a bcrypt hash
+      if (!this.passwordHash.startsWith('$2a$') && !this.passwordHash.startsWith('$2b$') && !this.passwordHash.startsWith('$2y$')) {
+        this.passwordHash = await bcrypt.hash(this.passwordHash, config.BCRYPT_ROUNDS);
+      }
     }
-    
+
     // Update level based on points
     (this as any).updateLevel();
 
     // Reset daily claims count if it's a new day
     (this as any).resetDailyClaimsIfNeeded();
-    
+
     // Update last active timestamp
     if (this.isModified('lastActive') || this.isNew) {
       this.lastActive = new Date();
     }
-    
+
     next();
   } catch (error) {
     typedLogger.error('Error in user pre-save middleware', { error: (error as any).message, userId: this._id });
@@ -356,10 +375,10 @@ userSchema.pre('save', async function(next) {
 });
 
 // Instance methods
-userSchema.methods.comparePassword = async function(candidatePassword: string): Promise<boolean> {
+userSchema.methods.comparePassword = async function (candidatePassword: string): Promise<boolean> {
   try {
     if (!this.passwordHash) return false;
-    
+
     // Always use bcrypt for simplicity
     return await bcrypt.compare(candidatePassword, this.passwordHash);
   } catch (error) {
@@ -368,19 +387,19 @@ userSchema.methods.comparePassword = async function(candidatePassword: string): 
   }
 };
 
-userSchema.methods.updateLevel = function(): void {
+userSchema.methods.updateLevel = function (): void {
   const totalPoints = this.points.total;
   let newLevel = UserLevel.BRONZE;
-  
+
   if (totalPoints >= 50000) newLevel = UserLevel.DIAMOND;
   else if (totalPoints >= 15000) newLevel = UserLevel.PLATINUM;
   else if (totalPoints >= 5000) newLevel = UserLevel.GOLD;
   else if (totalPoints >= 1000) newLevel = UserLevel.SILVER;
-  
+
   if (this.level !== newLevel) {
     const oldLevel = this.level;
     this.level = newLevel;
-    
+
     typedLogger.info('User level updated', {
       userId: this._id,
       oldLevel,
@@ -401,42 +420,42 @@ userSchema.methods.updateLevel = function(): void {
   }
 };
 
-userSchema.methods.addPoints = function(points: number): void {
+userSchema.methods.addPoints = function (points: number): void {
   this.points.available += points;
   this.points.total += points;
   this.updateLevel();
 };
 
-userSchema.methods.spendPoints = function(points: number): boolean {
+userSchema.methods.spendPoints = function (points: number): boolean {
   if (this.points.available < points) {
     return false;
   }
-  
+
   this.points.available -= points;
   this.points.spent += points;
   return true;
 };
 
-userSchema.methods.updateLocation = function(lat: number, lng: number, city: string): void {
+userSchema.methods.updateLocation = function (lat: number, lng: number, city: string): void {
   this.location = {
     lat,
     lng,
     city,
     lastUpdated: new Date(),
   };
-  
+
   // Update favorite city based on frequency
   this.updateFavoriteCity(city);
 };
 
-userSchema.methods.updateFavoriteCity = function(city: string): void {
+userSchema.methods.updateFavoriteCity = function (city: string): void {
   // Simple implementation - could be enhanced with more sophisticated tracking
   if (!this.stats.favoriteCity) {
     this.stats.favoriteCity = city;
   }
 };
 
-userSchema.methods.addDevice = function(
+userSchema.methods.addDevice = function (
   deviceId: string,
   platform: Platform,
   fcmToken?: string,
@@ -446,10 +465,10 @@ userSchema.methods.addDevice = function(
   this.devices.forEach(device => {
     device.isActive = false;
   });
-  
+
   // Check if device already exists
   const existingDevice = this.devices.find(device => device.deviceId === deviceId);
-  
+
   if (existingDevice) {
     existingDevice.platform = platform;
     existingDevice.fcmToken = fcmToken;
@@ -474,15 +493,15 @@ userSchema.methods.addDevice = function(
   }
 };
 
-userSchema.methods.removeDevice = function(deviceId: string): void {
+userSchema.methods.removeDevice = function (deviceId: string): void {
   this.devices = this.devices.filter(device => device.deviceId !== deviceId);
 };
 
-userSchema.methods.updateStreak = function(): void {
+userSchema.methods.updateStreak = function (): void {
   const today = new Date();
   const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
   const lastClaim = this.stats.lastClaimDate;
-  
+
   if (!lastClaim) {
     this.stats.currentStreak = 1;
   } else if (lastClaim.toDateString() === yesterday.toDateString()) {
@@ -490,35 +509,35 @@ userSchema.methods.updateStreak = function(): void {
   } else if (lastClaim.toDateString() !== today.toDateString()) {
     this.stats.currentStreak = 1;
   }
-  
+
   if (this.stats.currentStreak > this.stats.longestStreak) {
     this.stats.longestStreak = this.stats.currentStreak;
   }
 };
 
-userSchema.methods.resetDailyClaimsIfNeeded = function(): void {
+userSchema.methods.resetDailyClaimsIfNeeded = function (): void {
   const today = new Date();
   const lastClaim = this.stats.lastClaimDate;
-  
+
   if (!lastClaim || lastClaim.toDateString() !== today.toDateString()) {
     this.stats.dailyClaimsCount = 0;
   }
 };
 
-userSchema.methods.incrementDailyClaims = function(): void {
+userSchema.methods.incrementDailyClaims = function (): void {
   this.stats.dailyClaimsCount += 1;
   this.stats.lastClaimDate = new Date();
   this.updateStreak();
 };
 
-userSchema.methods.ban = function(reason: string, duration?: number): void {
+userSchema.methods.ban = function (reason: string, duration?: number): void {
   this.isBanned = true;
   this.banReason = reason;
-  
+
   if (duration) {
     this.banExpiresAt = new Date(Date.now() + duration);
   }
-  
+
   typedLogger.warn('User banned', {
     userId: this._id,
     reason,
@@ -527,62 +546,62 @@ userSchema.methods.ban = function(reason: string, duration?: number): void {
   });
 };
 
-userSchema.methods.unban = function(): void {
+userSchema.methods.unban = function (): void {
   this.isBanned = false;
   this.banReason = undefined;
   this.banExpiresAt = undefined;
-  
+
   typedLogger.info('User unbanned', { userId: this._id });
 };
 
-userSchema.methods.softDelete = function(): void {
+userSchema.methods.softDelete = function (): void {
   this.deletedAt = new Date();
   this.email = undefined;
   this.passwordHash = undefined;
   this.devices = [];
-  
+
   typedLogger.info('User soft deleted', { userId: this._id });
 };
 
-userSchema.methods.restore = function(): void {
+userSchema.methods.restore = function (): void {
   this.deletedAt = undefined;
-  
+
   typedLogger.info('User restored', { userId: this._id });
 };
 
 // Static methods
-userSchema.statics.findByEmail = function(email: string) {
+userSchema.statics.findByEmail = function (email: string) {
   return this.findOne({ email: email.toLowerCase(), deletedAt: { $exists: false } });
 };
 
-userSchema.statics.findByDeviceId = function(deviceId: string) {
-  return this.findOne({ 
+userSchema.statics.findByDeviceId = function (deviceId: string) {
+  return this.findOne({
     'devices.deviceId': deviceId,
     deletedAt: { $exists: false }
   });
 };
 
-userSchema.statics.findActiveUsers = function(days: number = 7) {
+userSchema.statics.findActiveUsers = function (days: number = 7) {
   const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-  return this.find({ 
+  return this.find({
     lastActive: { $gte: cutoff },
     deletedAt: { $exists: false }
   });
 };
 
-userSchema.statics.getLeaderboard = function(city?: string, limit: number = 100) {
+userSchema.statics.getLeaderboard = function (city?: string, limit: number = 100) {
   const query: any = { deletedAt: { $exists: false } };
   if (city) {
     query['location.city'] = city;
   }
-  
+
   return this.find(query)
     .sort({ 'points.total': -1 })
     .limit(limit)
     .select('displayName points.total level location.city stats.prizesFound');
 };
 
-userSchema.statics.getUserStats = async function() {
+userSchema.statics.getUserStats = async function () {
   const stats = await this.aggregate([
     { $match: { deletedAt: { $exists: false } } },
     {
@@ -606,12 +625,12 @@ userSchema.statics.getUserStats = async function() {
       }
     }
   ]);
-  
+
   return stats[0] || {};
 };
 
 // Static helper: get required points for a given level
-userSchema.statics.getPointsForLevel = function(level: UserLevel): number {
+userSchema.statics.getPointsForLevel = function (level: UserLevel): number {
   const levelRequirements: Record<UserLevel, number> = {
     [UserLevel.BRONZE]: 0,
     [UserLevel.SILVER]: 1000,
@@ -620,6 +639,41 @@ userSchema.statics.getPointsForLevel = function(level: UserLevel): number {
     [UserLevel.DIAMOND]: 50000,
   } as any;
   return levelRequirements[level] ?? 0;
+};
+
+/**
+ * ATOMIC OPERATIONS FOR CONCURRENCY SAFETY
+ */
+userSchema.statics.atomicSpendPoints = async function (userId: string | Types.ObjectId, pointsCost: number) {
+  return this.findOneAndUpdate(
+    {
+      _id: userId,
+      'points.available': { $gte: pointsCost }
+    },
+    {
+      $inc: {
+        'points.available': -pointsCost,
+        'points.spent': pointsCost,
+        'stats.rewardsRedeemed': 1
+      },
+      $set: { lastActive: new Date() }
+    },
+    { new: true }
+  );
+};
+
+userSchema.statics.atomicAddPoints = async function (userId: string | Types.ObjectId, points: number) {
+  return this.findOneAndUpdate(
+    { _id: userId },
+    {
+      $inc: {
+        'points.available': points,
+        'points.total': points
+      },
+      $set: { lastActive: new Date() }
+    },
+    { new: true }
+  );
 };
 
 // Create and export the model

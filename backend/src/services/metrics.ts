@@ -27,6 +27,7 @@ export interface GameMetrics {
   networkLatency: number;
   frameRate: number;
   crashes: number;
+  platform?: string; // e.g. 'ios', 'android'
 }
 
 export interface BusinessMetrics {
@@ -38,6 +39,88 @@ export interface BusinessMetrics {
   revenuePerUser: number;
   churnRate: number;
 }
+
+export interface APIMetricsResult {
+  averageResponseTime: number;
+  totalRequests: number;
+  errorRate: number;
+  totalErrors: number;
+}
+
+export interface GameMetricsSummary {
+  totalSessions: number;
+  averageSessionDuration: number;
+  totalPrizesClaimed: number;
+  averageFrameRate: number;
+  crashCount: number;
+}
+
+export interface SystemMetrics {
+  memoryUsage: NodeJS.MemoryUsage;
+  uptime: number;
+  cpuUsage: NodeJS.CpuUsage;
+}
+
+export interface BusinessMetricsSummary {
+  activeUsers: number;
+  newUsers: number;
+  retentionRate: number;
+}
+
+export interface UserSessionStats {
+  totalSessions: number;
+  totalDuration: number;
+  totalDistance: number;
+  totalPrizesClaimed: number;
+  averageFrameRate: number;
+  lastUpdated: string;
+}
+
+export interface RealTimeMetrics {
+  timestamp: string;
+  api: APIMetricsResult | {};
+  game: GameMetricsSummary | {};
+  system: SystemMetrics | {};
+  business: BusinessMetricsSummary | {};
+  unity: UnityPerformanceMetrics | {};
+}
+
+export interface UnityPerformanceMetrics {
+  averageFrameRate: number;
+  averageLatency: number;
+  averageBatteryUsage: number;
+  crashRate: number;
+  sessionDuration: number;
+  totalSessions: number;
+  userEngagement: Record<string, unknown>; // Complex object
+  performanceByPlatform: {
+    ios: { fps: number; latency: number; battery: number; crashes: number };
+    android: { fps: number; latency: number; battery: number; crashes: number };
+  };
+}
+
+const DEFAULT_API_METRICS: APIMetricsResult = { averageResponseTime: 0, totalRequests: 0, errorRate: 0, totalErrors: 0 };
+const DEFAULT_GAME_METRICS: GameMetricsSummary = { totalSessions: 0, averageSessionDuration: 0, totalPrizesClaimed: 0, averageFrameRate: 0, crashCount: 0 };
+const DEFAULT_SYSTEM_METRICS: SystemMetrics = {
+  memoryUsage: { rss: 0, heapTotal: 0, heapUsed: 0, external: 0, arrayBuffers: 0 },
+  uptime: 0,
+  cpuUsage: { user: 0, system: 0 }
+};
+const DEFAULT_BUSINESS_METRICS: BusinessMetricsSummary = { activeUsers: 0, newUsers: 0, retentionRate: 0 };
+const DEFAULT_UNITY_METRICS: UnityPerformanceMetrics = {
+  averageFrameRate: 0,
+  averageLatency: 0,
+  averageBatteryUsage: 0,
+  crashRate: 0,
+  sessionDuration: 0,
+  totalSessions: 0,
+  userEngagement: {},
+  performanceByPlatform: {
+    ios: { fps: 0, latency: 0, battery: 0, crashes: 0 },
+    android: { fps: 0, latency: 0, battery: 0, crashes: 0 }
+  }
+};
+
 
 export class MetricsService {
   private static redis = redisClient;
@@ -52,7 +135,11 @@ export class MetricsService {
     // Start automatic buffer flushing
     setInterval(() => {
       this.flushMetrics();
+      this.snapshotActiveUsers();
     }, this.flushInterval);
+
+    // Initial snapshot
+    this.snapshotActiveUsers();
 
     typedLogger.info('Metrics service initialized');
   }
@@ -80,7 +167,7 @@ export class MetricsService {
         await this.recordRealTimeMetric(event);
       }
     } catch (error) {
-      typedLogger.error('Record metric error', { error: (error as any).message, event });
+      typedLogger.error('Record metric error', { error: error instanceof Error ? error.message : 'Unknown error', event });
     }
   }
 
@@ -95,49 +182,49 @@ export class MetricsService {
           value: metrics.sessionDuration,
           userId,
           sessionId,
-          tags: { platform: 'unity' },
+          tags: { platform: metrics.platform || 'unity' },
         },
         {
           name: 'game.prizes.found',
           value: metrics.prizesFound,
           userId,
           sessionId,
-          tags: { platform: 'unity' },
+          tags: { platform: metrics.platform || 'unity' },
         },
         {
           name: 'game.prizes.claimed',
           value: metrics.prizesClaimed,
           userId,
           sessionId,
-          tags: { platform: 'unity' },
+          tags: { platform: metrics.platform || 'unity' },
         },
         {
           name: 'game.distance.traveled',
           value: metrics.distanceTraveled,
           userId,
           sessionId,
-          tags: { platform: 'unity', unit: 'meters' },
+          tags: { platform: metrics.platform || 'unity', unit: 'meters' },
         },
         {
           name: 'game.performance.fps',
           value: metrics.frameRate,
           userId,
           sessionId,
-          tags: { platform: 'unity' },
+          tags: { platform: metrics.platform || 'unity' },
         },
         {
           name: 'game.performance.latency',
           value: metrics.networkLatency,
           userId,
           sessionId,
-          tags: { platform: 'unity', unit: 'ms' },
+          tags: { platform: metrics.platform || 'unity', unit: 'ms' },
         },
         {
           name: 'game.battery.usage',
           value: metrics.batteryUsage,
           userId,
           sessionId,
-          tags: { platform: 'unity', unit: 'percent' },
+          tags: { platform: metrics.platform || 'unity', unit: 'percent' },
         },
       ];
 
@@ -148,7 +235,7 @@ export class MetricsService {
           value: metrics.crashes,
           userId,
           sessionId,
-          tags: { platform: 'unity', severity: 'high' },
+          tags: { platform: metrics.platform || 'unity', severity: 'high' },
         });
       }
 
@@ -161,7 +248,7 @@ export class MetricsService {
       await this.updateUserSessionStats(userId, metrics);
 
     } catch (error) {
-      typedLogger.error('Record game metrics error', { error: (error as any).message, userId, sessionId });
+      typedLogger.error('Record game metrics error', { error: error instanceof Error ? error.message : 'Unknown error', userId, sessionId });
     }
   }
 
@@ -202,7 +289,7 @@ export class MetricsService {
         });
       }
     } catch (error) {
-      typedLogger.error('Record API metrics error', { error: (error as any).message, endpoint, method });
+      typedLogger.error('Record API metrics error', { error: error instanceof Error ? error.message : 'Unknown error', endpoint, method });
     }
   }
 
@@ -212,7 +299,7 @@ export class MetricsService {
   static async recordBusinessMetrics(): Promise<void> {
     try {
       const metrics = await this.calculateBusinessMetrics();
-      
+
       const events: MetricEvent[] = [
         {
           name: 'business.users.daily_active',
@@ -250,37 +337,46 @@ export class MetricsService {
         await this.recordMetric(event);
       }
     } catch (error) {
-      typedLogger.error('Record business metrics error', { error: (error as any).message });
+      typedLogger.error('Record business metrics error', { error: error instanceof Error ? error.message : 'Unknown error' });
     }
   }
 
   /**
    * Get real-time metrics for monitoring dashboards
    */
-  static async getRealTimeMetrics(): Promise<Record<string, any>> {
+  static async getRealTimeMetrics(): Promise<RealTimeMetrics> {
     try {
       const now = new Date();
+      const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
       const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
 
       const metrics = {
         timestamp: now.toISOString(),
-        api: await this.getAPIMetrics(oneHourAgo, now),
-        game: await this.getGameMetrics(oneHourAgo, now),
+        api: await this.getAPIMetrics(oneHourAgo, now), // Keep API stats for 1h for smoothing
+        game: await this.getGameMetrics(oneHourAgo, now), // Game stats 1h
         system: await this.getSystemMetrics(),
-        business: await this.getBusinessMetrics(oneHourAgo, now),
+        business: await this.getBusinessMetrics(fiveMinutesAgo, now), // Business/User stats shorter window for "Real Time" feel
+        unity: await this.getUnityPerformanceMetrics({ start: oneHourAgo, end: now }),
       };
 
       return metrics;
     } catch (error) {
-      typedLogger.error('Get real-time metrics error', { error: (error as any).message });
-      return {};
+      typedLogger.error('Get real-time metrics error', { error: error instanceof Error ? error.message : 'Unknown error' });
+      return {
+        timestamp: new Date().toISOString(),
+        api: DEFAULT_API_METRICS,
+        game: DEFAULT_GAME_METRICS,
+        system: DEFAULT_SYSTEM_METRICS,
+        business: DEFAULT_BUSINESS_METRICS,
+        unity: DEFAULT_UNITY_METRICS,
+      };
     }
   }
 
   /**
    * Get Unity-specific performance metrics
    */
-  static async getUnityPerformanceMetrics(timeRange: { start: Date; end: Date }): Promise<any> {
+  static async getUnityPerformanceMetrics(timeRange: { start: Date; end: Date }): Promise<UnityPerformanceMetrics | {}> {
     try {
       const metrics = {
         averageFrameRate: await this.getAverageMetric('game.performance.fps', timeRange),
@@ -288,20 +384,35 @@ export class MetricsService {
         averageBatteryUsage: await this.getAverageMetric('game.battery.usage', timeRange),
         crashRate: await this.getCrashRate(timeRange),
         sessionDuration: await this.getAverageMetric('game.session.duration', timeRange),
+        totalSessions: await this.getMetricCount('game.session.duration', timeRange.start, timeRange.end),
         userEngagement: await this.getUserEngagementMetrics(timeRange),
+        performanceByPlatform: {
+          ios: {
+            fps: await this.getAverageMetric('game.performance.fps:ios', timeRange),
+            latency: await this.getAverageMetric('game.performance.latency:ios', timeRange),
+            battery: await this.getAverageMetric('game.battery.usage:ios', timeRange),
+            crashes: await this.getMetricSum('game.crashes:ios', timeRange.start, timeRange.end)
+          },
+          android: {
+            fps: await this.getAverageMetric('game.performance.fps:android', timeRange),
+            latency: await this.getAverageMetric('game.performance.latency:android', timeRange),
+            battery: await this.getAverageMetric('game.battery.usage:android', timeRange),
+            crashes: await this.getMetricSum('game.crashes:android', timeRange.start, timeRange.end)
+          }
+        }
       };
 
       return metrics;
     } catch (error) {
-      typedLogger.error('Get Unity performance metrics error', { error: (error as any).message, timeRange });
-      return {};
+      typedLogger.error('Get Unity performance metrics error', { error: error instanceof Error ? error.message : 'Unknown error', timeRange });
+      return DEFAULT_UNITY_METRICS;
     }
   }
 
   /**
    * Generate metrics report for admin dashboard
    */
-  static async generateMetricsReport(period: 'daily' | 'weekly' | 'monthly'): Promise<any> {
+  static async generateMetricsReport(period: 'daily' | 'weekly' | 'monthly'): Promise<Record<string, unknown>> {
     try {
       const now = new Date();
       let startDate: Date;
@@ -330,8 +441,93 @@ export class MetricsService {
 
       return report;
     } catch (error) {
-      typedLogger.error('Generate metrics report error', { error: (error as any).message, period });
+      typedLogger.error('Generate metrics report error', { error: error instanceof Error ? error.message : 'Unknown error', period });
       return {};
+    }
+  }
+
+  /**
+   * Snapshot active users from Redis
+   * Scans for active session keys and records the count
+   */
+  static async snapshotActiveUsers(): Promise<void> {
+    try {
+      // Count session:game_session_* keys
+      const pattern = 'session:game_session_*';
+      let cursor = '0';
+      let count = 0;
+
+      do {
+        const result = await this.redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+        cursor = result[0];
+        const keys = result[1];
+
+        // Only count keys that actually exist and have status='active' (double check)
+        // For performance, we'll just count the keys for now as they are TTL'd
+        count += keys.length;
+      } while (cursor !== '0');
+
+      // Record count
+      await this.recordMetric({
+        name: 'business.users.active_count',
+        value: count,
+        tags: { type: 'snapshot' }
+      });
+
+      // Also snapshot active sessions (same as users for now, but semantically different)
+      await this.recordMetric({
+        name: 'game.sessions.active_count',
+        value: count,
+        tags: { type: 'snapshot' }
+      });
+
+    } catch (error) {
+      typedLogger.error('Snapshot active users error', { error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  }
+
+  /**
+   * Get historical metrics for charts
+   */
+  static async getMetricHistory(metricName: string, range: string = '1h'): Promise<{ time: string; value: number }[]> {
+    try {
+      const now = Date.now();
+      let start = now - 60 * 60 * 1000; // Default 1h
+
+      switch (range) {
+        case '1h': start = now - 60 * 60 * 1000; break;
+        case '24h': start = now - 24 * 60 * 60 * 1000; break;
+        case '7d': start = now - 7 * 24 * 60 * 60 * 1000; break;
+        case '30d': start = now - 30 * 24 * 60 * 60 * 1000; break;
+      }
+
+      const timeSeriesKey = `ts:${metricName}`;
+
+      // Get all values in range
+      const results = await this.redis.zrangebyscore(
+        timeSeriesKey,
+        start,
+        now
+      );
+
+      return results.map(res => {
+        try {
+          const data = JSON.parse(res);
+          return {
+            time: data.timestamp, // ISO string
+            value: data.value
+          };
+        } catch {
+          return null;
+        }
+      }).filter(Boolean) as { time: string; value: number }[];
+
+    } catch (error) {
+      typedLogger.error('Get metric history error', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        metricName
+      });
+      return [];
     }
   }
 
@@ -353,7 +549,7 @@ export class MetricsService {
 
       typedLogger.debug('Metrics flushed', { count: metricsToFlush.length });
     } catch (error) {
-      typedLogger.error('Flush metrics error', { error: (error as any).message });
+      typedLogger.error('Flush metrics error', { error: error instanceof Error ? error.message : 'Unknown error' });
     }
   }
 
@@ -378,8 +574,19 @@ export class MetricsService {
 
       // Expire time series after 30 days
       await this.redis.expire(timeSeriesKey, 30 * 24 * 60 * 60);
+
+      // Also add to platform-specific time series
+      if (metric.tags?.platform && ['ios', 'android'].includes(metric.tags.platform.toLowerCase())) {
+        const platformKey = `ts:${metric.name}:${metric.tags.platform.toLowerCase()}`;
+        await this.redis.zadd(
+          platformKey,
+          metric.timestamp?.getTime() || Date.now(),
+          JSON.stringify(data)
+        );
+        await this.redis.expire(platformKey, 30 * 24 * 60 * 60);
+      }
     } catch (error) {
-      typedLogger.error('Store metric error', { error: (error as any).message, metric });
+      typedLogger.error('Store metric error', { error: error instanceof Error ? error.message : 'Unknown error', metric });
     }
   }
 
@@ -389,7 +596,7 @@ export class MetricsService {
       const key = `realtime:${event.name}`;
       await this.redis.setex(key, 300, JSON.stringify(event)); // 5 minutes TTL
     } catch (error) {
-      typedLogger.error('Record real-time metric error', { error: (error as any).message, event });
+      typedLogger.error('Record real-time metric error', { error: error instanceof Error ? error.message : 'Unknown error', event });
     }
   }
 
@@ -408,8 +615,8 @@ export class MetricsService {
     try {
       const statsKey = `user_stats:${userId}`;
       const currentStats = await this.redis.get(statsKey);
-      
-      let stats = currentStats ? JSON.parse(currentStats) : {
+
+      let stats: UserSessionStats = currentStats ? JSON.parse(currentStats) : {
         totalSessions: 0,
         totalDuration: 0,
         totalDistance: 0,
@@ -429,7 +636,7 @@ export class MetricsService {
       // Store updated stats
       await this.redis.setex(statsKey, 30 * 24 * 60 * 60, JSON.stringify(stats)); // 30 days TTL
     } catch (error) {
-      typedLogger.error('Update user session stats error', { error: (error as any).message, userId });
+      typedLogger.error('Update user session stats error', { error: error instanceof Error ? error.message : 'Unknown error', userId });
     }
   }
 
@@ -447,7 +654,7 @@ export class MetricsService {
         churnRate: 0,
       };
     } catch (error) {
-      typedLogger.error('Calculate business metrics error', { error: (error as any).message });
+      typedLogger.error('Calculate business metrics error', { error: error instanceof Error ? error.message : 'Unknown error' });
       return {
         dailyActiveUsers: 0,
         monthlyActiveUsers: 0,
@@ -460,29 +667,29 @@ export class MetricsService {
     }
   }
 
-  private static async getAPIMetrics(start: Date, end: Date): Promise<any> {
+  private static async getAPIMetrics(start: Date, end: Date): Promise<APIMetricsResult> {
     try {
       // Get API metrics from time series
       const requestDurations = await this.getMetricValues('api.request.duration', start, end);
       const errorCounts = await this.getMetricValues('api.request.errors', start, end);
 
       return {
-        averageResponseTime: requestDurations.length > 0 
-          ? requestDurations.reduce((a, b) => a + b, 0) / requestDurations.length 
+        averageResponseTime: requestDurations.length > 0
+          ? requestDurations.reduce((a, b) => a + b, 0) / requestDurations.length
           : 0,
         totalRequests: requestDurations.length,
-        errorRate: requestDurations.length > 0 
-          ? (errorCounts.length / requestDurations.length) * 100 
+        errorRate: requestDurations.length > 0
+          ? (errorCounts.length / requestDurations.length) * 100
           : 0,
         totalErrors: errorCounts.length,
       };
     } catch (error) {
-      typedLogger.error('Get API metrics error', { error: (error as any).message, start, end });
-      return {};
+      typedLogger.error('Get API metrics error', { error: error instanceof Error ? error.message : 'Unknown error', start, end });
+      return DEFAULT_API_METRICS;
     }
   }
 
-  private static async getGameMetrics(start: Date, end: Date): Promise<any> {
+  private static async getGameMetrics(start: Date, end: Date): Promise<GameMetricsSummary> {
     try {
       return {
         totalSessions: await this.getMetricCount('game.session.duration', start, end),
@@ -492,12 +699,12 @@ export class MetricsService {
         crashCount: await this.getMetricSum('game.crashes', start, end),
       };
     } catch (error) {
-      typedLogger.error('Get game metrics error', { error: (error as any).message, start, end });
-      return {};
+      typedLogger.error('Get game metrics error', { error: error instanceof Error ? error.message : 'Unknown error', start, end });
+      return DEFAULT_GAME_METRICS;
     }
   }
 
-  private static async getSystemMetrics(): Promise<any> {
+  private static async getSystemMetrics(): Promise<SystemMetrics> {
     try {
       // Get current system metrics
       return {
@@ -506,12 +713,12 @@ export class MetricsService {
         cpuUsage: process.cpuUsage(),
       };
     } catch (error) {
-      typedLogger.error('Get system metrics error', { error: (error as any).message });
-      return {};
+      typedLogger.error('Get system metrics error', { error: error instanceof Error ? error.message : 'Unknown error' });
+      return DEFAULT_SYSTEM_METRICS;
     }
   }
 
-  private static async getBusinessMetrics(start: Date, end: Date): Promise<any> {
+  private static async getBusinessMetrics(start: Date, end: Date): Promise<BusinessMetricsSummary> {
     try {
       return {
         activeUsers: await this.getUniqueUserCount(start, end),
@@ -519,8 +726,8 @@ export class MetricsService {
         retentionRate: await this.calculateRetentionRate(start, end),
       };
     } catch (error) {
-      typedLogger.error('Get business metrics error', { error: (error as any).message, start, end });
-      return {};
+      typedLogger.error('Get business metrics error', { error: error instanceof Error ? error.message : 'Unknown error', start, end });
+      return DEFAULT_BUSINESS_METRICS;
     }
   }
 
@@ -542,7 +749,7 @@ export class MetricsService {
         }
       });
     } catch (error) {
-      typedLogger.error('Get metric values error', { error: (error as any).message, metricName, start, end });
+      typedLogger.error('Get metric values error', { error: error instanceof Error ? error.message : 'Unknown error', metricName, start, end });
       return [];
     }
   }
@@ -552,7 +759,7 @@ export class MetricsService {
       const values = await this.getMetricValues(metricName, timeRange.start, timeRange.end);
       return values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0;
     } catch (error) {
-      typedLogger.error('Get average metric error', { error: (error as any).message, metricName, timeRange });
+      typedLogger.error('Get average metric error', { error: error instanceof Error ? error.message : 'Unknown error', metricName, timeRange });
       return 0;
     }
   }
@@ -562,7 +769,7 @@ export class MetricsService {
       const values = await this.getMetricValues(metricName, start, end);
       return values.length;
     } catch (error) {
-      typedLogger.error('Get metric count error', { error: (error as any).message, metricName, start, end });
+      typedLogger.error('Get metric count error', { error: error instanceof Error ? error.message : 'Unknown error', metricName, start, end });
       return 0;
     }
   }
@@ -572,7 +779,7 @@ export class MetricsService {
       const values = await this.getMetricValues(metricName, start, end);
       return values.reduce((a, b) => a + b, 0);
     } catch (error) {
-      typedLogger.error('Get metric sum error', { error: (error as any).message, metricName, start, end });
+      typedLogger.error('Get metric sum error', { error: error instanceof Error ? error.message : 'Unknown error', metricName, start, end });
       return 0;
     }
   }
@@ -583,12 +790,12 @@ export class MetricsService {
       const sessions = await this.getMetricCount('game.session.duration', timeRange.start, timeRange.end);
       return sessions > 0 ? (crashes / sessions) * 100 : 0;
     } catch (error) {
-      typedLogger.error('Get crash rate error', { error: (error as any).message, timeRange });
+      typedLogger.error('Get crash rate error', { error: error instanceof Error ? error.message : 'Unknown error', timeRange });
       return 0;
     }
   }
 
-  private static async getUserEngagementMetrics(timeRange: { start: Date; end: Date }): Promise<any> {
+  private static async getUserEngagementMetrics(timeRange: { start: Date; end: Date }): Promise<Record<string, unknown>> {
     try {
       // This would calculate user engagement based on session data
       return {
@@ -597,12 +804,12 @@ export class MetricsService {
         retentionRate: 0,
       };
     } catch (error) {
-      typedLogger.error('Get user engagement metrics error', { error: (error as any).message, timeRange });
+      typedLogger.error('Get user engagement metrics error', { error: error instanceof Error ? error.message : 'Unknown error', timeRange });
       return {};
     }
   }
 
-  private static async getMetricsSummary(timeRange: { start: Date; end: Date }): Promise<any> {
+  private static async getMetricsSummary(timeRange: { start: Date; end: Date }): Promise<Record<string, unknown>> {
     try {
       return {
         totalEvents: await this.getTotalEventCount(timeRange),
@@ -611,12 +818,12 @@ export class MetricsService {
         totalErrors: await this.getMetricSum('api.request.errors', timeRange.start, timeRange.end),
       };
     } catch (error) {
-      typedLogger.error('Get metrics summary error', { error: (error as any).message, timeRange });
+      typedLogger.error('Get metrics summary error', { error: error instanceof Error ? error.message : 'Unknown error', timeRange });
       return {};
     }
   }
 
-  private static async getMetricsTrends(timeRange: { start: Date; end: Date }): Promise<any> {
+  private static async getMetricsTrends(timeRange: { start: Date; end: Date }): Promise<Record<string, unknown>> {
     try {
       // Calculate trends over the time period
       return {
@@ -626,12 +833,12 @@ export class MetricsService {
         errorTrend: 0,
       };
     } catch (error) {
-      typedLogger.error('Get metrics trends error', { error: (error as any).message, timeRange });
+      typedLogger.error('Get metrics trends error', { error: error instanceof Error ? error.message : 'Unknown error', timeRange });
       return {};
     }
   }
 
-  private static async getMetricsAlerts(timeRange: { start: Date; end: Date }): Promise<any[]> {
+  private static async getMetricsAlerts(timeRange: { start: Date; end: Date }): Promise<Record<string, unknown>[]> {
     try {
       const alerts = [];
 
@@ -657,12 +864,12 @@ export class MetricsService {
 
       return alerts;
     } catch (error) {
-      typedLogger.error('Get metrics alerts error', { error: (error as any).message, timeRange });
+      typedLogger.error('Get metrics alerts error', { error: error instanceof Error ? error.message : 'Unknown error', timeRange });
       return [];
     }
   }
 
-  private static async getMetricsRecommendations(timeRange: { start: Date; end: Date }): Promise<any[]> {
+  private static async getMetricsRecommendations(timeRange: { start: Date; end: Date }): Promise<Record<string, unknown>[]> {
     try {
       const recommendations = [];
 
@@ -678,7 +885,7 @@ export class MetricsService {
 
       return recommendations;
     } catch (error) {
-      typedLogger.error('Get metrics recommendations error', { error: (error as any).message, timeRange });
+      typedLogger.error('Get metrics recommendations error', { error: error instanceof Error ? error.message : 'Unknown error', timeRange });
       return [];
     }
   }
@@ -689,7 +896,7 @@ export class MetricsService {
       // This would integrate with Prometheus, DataDog, etc.
       typedLogger.debug('Metrics sent to external systems', { count: metrics.length });
     } catch (error) {
-      typedLogger.error('Send to external systems error', { error: (error as any).message });
+      typedLogger.error('Send to external systems error', { error: error instanceof Error ? error.message : 'Unknown error' });
     }
   }
 
@@ -698,17 +905,23 @@ export class MetricsService {
       // Count total events in time range
       return 0;
     } catch (error) {
-      typedLogger.error('Get total event count error', { error: (error as any).message, timeRange });
+      typedLogger.error('Get total event count error', { error: error instanceof Error ? error.message : 'Unknown error', timeRange });
       return 0;
     }
   }
 
   private static async getUniqueUserCount(start: Date, end: Date): Promise<number> {
     try {
-      // Count unique users in time range
-      return 0;
+      // Get session counts from timeseries
+      const counts = await this.getMetricValues('business.users.active_count', start, end);
+
+      if (counts.length === 0) return 0;
+
+      // Return the max count seen in this period (peak active users)
+      // Or for "Current" (last 1 hour), the latest might be better, but Peak is a safe 'Active' metric
+      return Math.max(...counts);
     } catch (error) {
-      typedLogger.error('Get unique user count error', { error: (error as any).message, start, end });
+      typedLogger.error('Get unique user count error', { error: error instanceof Error ? error.message : 'Unknown error', start, end });
       return 0;
     }
   }
@@ -718,7 +931,7 @@ export class MetricsService {
       // Count new users in time range
       return 0;
     } catch (error) {
-      typedLogger.error('Get new user count error', { error: (error as any).message, start, end });
+      typedLogger.error('Get new user count error', { error: error instanceof Error ? error.message : 'Unknown error', start, end });
       return 0;
     }
   }
@@ -728,7 +941,7 @@ export class MetricsService {
       // Calculate user retention rate
       return 0;
     } catch (error) {
-      typedLogger.error('Calculate retention rate error', { error: (error as any).message, start, end });
+      typedLogger.error('Calculate retention rate error', { error: error instanceof Error ? error.message : 'Unknown error', start, end });
       return 0;
     }
   }

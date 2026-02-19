@@ -2,6 +2,8 @@ import { FastifyInstance, FastifyRequest } from 'fastify';
 import { authenticate, requireAdmin } from '@/middleware/auth';
 import { adminRateLimit } from '@/middleware/distributed-rate-limit';
 import { AdminSystemService } from '../services/admin-system.service';
+import { AdminUsersService } from '../services/admin-users.service';
+import AdminPrizesService from '../services/admin-prizes.service';
 import { audit } from '@/lib/audit-logger';
 
 export default async function systemRoutes(fastify: FastifyInstance) {
@@ -9,39 +11,40 @@ export default async function systemRoutes(fastify: FastifyInstance) {
   fastify.addHook('preHandler', requireAdmin);
   fastify.addHook('preHandler', adminRateLimit);
 
-  // GET /system/health - get health status
+  // ... (existing routes omitted for brevity, focusing on relevant connections below)
+
+  // GET /system/health
   fastify.get('/system/health', async (request: FastifyRequest, reply) => {
     const health = await AdminSystemService.getHealthStatus();
     return reply.send(health);
   });
 
-  // GET /system/metrics - get system metrics
+  // GET /system/metrics
   fastify.get('/system/metrics', async (request: FastifyRequest, reply) => {
     const metrics = await AdminSystemService.getSystemMetrics();
     return reply.send(metrics);
   });
 
-  // GET /system/logs - get system logs (alias to audit logs)
-  fastify.get('/system/logs', async (request: FastifyRequest, reply) => {
+  // GET /system/logs
+  fastify.get('/system/logs', async (request: FastifyRequest<{ Querystring: { page?: string; limit?: string } }>, reply) => {
+    const query = request.query;
     const logs = await AdminSystemService.getSystemLogs({
-      page: parseInt((request.query as any).page) || 1,
-      limit: parseInt((request.query as any).limit) || 50
+      page: parseInt(query.page || '1'),
+      limit: parseInt(query.limit || '50')
     });
     return reply.send(logs);
   });
 
-  // GET /system/stats - aggregate system statistics
+  // GET /system/stats
   fastify.get('/system/stats', async (_request, reply) => {
     const stats = await AdminSystemService.getSystemStats();
     return reply.send(stats);
   });
 
-  // POST /system/cache/clear - clear cache
+  // POST /system/cache/clear
   fastify.post('/system/cache/clear', async (request: FastifyRequest, reply) => {
-    const adminId = (request as any).user?.sub || (request as any).user?.id;
+    const adminId = request.user?.sub;
     const result = await AdminSystemService.clearCache();
-    
-    // Audit log
     await audit.custom({
       userId: adminId,
       userRole: 'admin',
@@ -51,16 +54,13 @@ export default async function systemRoutes(fastify: FastifyInstance) {
       severity: 'medium',
       description: 'Cleared system cache',
     });
-    
     return reply.send(result);
   });
 
-  // POST /system/backup - create backup stub
+  // POST /system/backup
   fastify.post('/system/backup', async (request: FastifyRequest, reply) => {
-    const adminId = (request as any).user?.sub || (request as any).user?.id || (request as any).userId;
+    const adminId = request.user?.sub;
     const result = await AdminSystemService.createBackup(adminId);
-    
-    // Audit log
     await audit.custom({
       userId: adminId,
       userRole: 'admin',
@@ -71,17 +71,14 @@ export default async function systemRoutes(fastify: FastifyInstance) {
       description: 'Created system backup',
       metadata: result,
     });
-    
     return reply.send(result);
   });
 
-  // POST /system/restore - restore backup stub
+  // POST /system/restore
   fastify.post('/system/restore', async (request: FastifyRequest, reply) => {
     const { backupId } = request.body as { backupId: string };
-    const adminId = (request as any).user?.sub || (request as any).user?.id || (request as any).userId;
+    const adminId = request.user?.sub;
     const result = await AdminSystemService.restoreBackup(adminId, backupId);
-    
-    // Audit log
     await audit.custom({
       userId: adminId,
       userRole: 'admin',
@@ -93,16 +90,13 @@ export default async function systemRoutes(fastify: FastifyInstance) {
       description: `Restored backup: ${backupId}`,
       metadata: { backupId },
     });
-    
     return reply.send(result);
   });
 
-  // POST /backup/create - alias for create backup
+  // POST /backup/create
   fastify.post('/backup/create', async (request: FastifyRequest, reply) => {
-    const adminId = (request as any).user?.sub || (request as any).user?.id || (request as any).userId;
+    const adminId = request.user?.sub;
     const result = await AdminSystemService.createBackup(adminId);
-    
-    // Audit log
     await audit.custom({
       userId: adminId,
       userRole: 'admin',
@@ -113,16 +107,60 @@ export default async function systemRoutes(fastify: FastifyInstance) {
       description: 'Created system backup',
       metadata: result,
     });
-    
     return reply.send(result);
   });
 
-  // GET /logs - alias for system logs
-  fastify.get('/logs', async (request: FastifyRequest, reply) => {
+  // GET /logs
+  fastify.get('/logs', async (request: FastifyRequest<{ Querystring: { page?: string; limit?: string } }>, reply) => {
+    const query = request.query;
     const logs = await AdminSystemService.getSystemLogs({
-      page: parseInt((request.query as any).page) || 1,
-      limit: parseInt((request.query as any).limit) || 50
+      page: parseInt(query.page || '1'),
+      limit: parseInt(query.limit || '50')
     });
     return reply.send(logs);
+  });
+
+  // GET /audit-logs
+  fastify.get('/audit-logs', async (request: FastifyRequest<{ Querystring: { page?: string; limit?: string } }>, reply) => {
+    const query = request.query;
+    const logs = await AdminSystemService.getSystemLogs({
+      page: parseInt(query.page || '1'),
+      limit: parseInt(query.limit || '50')
+    });
+    return reply.send(logs);
+  });
+
+  // POST /bulk-operations
+  fastify.post('/bulk-operations', async (request: FastifyRequest, reply) => {
+    const { action, ids, data } = request.body as { action: string; ids: string[]; data?: Record<string, unknown> };
+    const adminId = request.user?.sub;
+
+    if (!action || !ids || !Array.isArray(ids) || ids.length === 0) {
+      return reply.status(400).send({ success: false, error: 'Invalid bulk operation request' });
+    }
+
+    try {
+      let result;
+
+      switch (action) {
+        case 'delete_users':
+          result = await AdminUsersService.bulkDelete(ids, adminId);
+          result.message = 'Bulk delete completed';
+          break;
+        case 'approve_prizes':
+          result = await AdminPrizesService.bulkApprove(ids, adminId);
+          result.message = 'Bulk approve completed';
+          break;
+        default:
+          return reply.status(400).send({ success: false, error: 'Unsupported bulk action' });
+      }
+
+      // No need to double-log here as services handle specific audit logging now
+      // Just returning the aggregated result
+      return reply.send(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Bulk operation failed';
+      return reply.status(500).send({ success: false, error: message });
+    }
   });
 }

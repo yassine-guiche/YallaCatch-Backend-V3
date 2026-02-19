@@ -84,8 +84,9 @@ export class AdminPrizesService {
       total: 0
     };
     statsAggregation.forEach((item: { _id: string; count: number }) => {
+      type StatsKey = 'active' | 'captured' | 'expired' | 'inactive' | 'revoked';
       if (item._id in stats) {
-        (stats as any)[item._id] = item.count;
+        stats[item._id as StatsKey] = item.count;
       }
       stats.total += item.count;
     });
@@ -118,6 +119,7 @@ export class AdminPrizesService {
 
   static async createPrize(prizeData: Record<string, unknown>, adminId: string) {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const p = prizeData as any;
       const lat = typeof p.latitude === 'number' ? p.latitude : 36.8065;
       const lng = typeof p.longitude === 'number' ? p.longitude : 10.1815;
@@ -164,6 +166,7 @@ export class AdminPrizesService {
         metadata: p.metadata as Record<string, unknown> | undefined,
       };
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const prize = await PrizeService.createPrize(adminId, mappedData as any);
 
       await this.logAction(adminId, 'CREATE_PRIZE', prize._id.toString(), {
@@ -228,7 +231,7 @@ export class AdminPrizesService {
         throw new Error('Prize not found');
       }
       if (!prize.createdBy) {
-        (prize as any).createdBy = new Types.ObjectId(adminId);
+        prize.createdBy = new Types.ObjectId(adminId);
       }
 
       const prizeName = prize.name;
@@ -281,7 +284,7 @@ export class AdminPrizesService {
     const prizes = await Prize.find({
       'location.coordinates': {
         $near: {
-          $geometry: point as any,
+          $geometry: point as { type: string; coordinates: number[] },
           $maxDistance: radius
         }
       },
@@ -291,6 +294,39 @@ export class AdminPrizesService {
       .lean();
 
     return prizes;
+  }
+
+  static async bulkApprove(prizeIds: string[], adminId: string) {
+    try {
+      const sanitizedIds = prizeIds.filter((id) => Types.ObjectId.isValid(id));
+      if (sanitizedIds.length === 0) return { success: true, count: 0 };
+
+      const result = await Prize.updateMany(
+        { _id: { $in: sanitizedIds } },
+        { $set: { status: 'active', isActive: true, approvedAt: new Date(), approvedBy: adminId } }
+      );
+
+      // Log action
+      await audit.custom({
+        userId: adminId,
+        userRole: 'admin',
+        action: 'BULK_APPROVE_PRIZES',
+        resource: 'prize',
+        category: 'admin',
+        severity: 'medium',
+        description: `Bulk approved ${result.modifiedCount} prizes`,
+        metadata: {
+          requestedCount: prizeIds.length,
+          approvedCount: result.modifiedCount,
+          ids: sanitizedIds,
+        },
+      });
+
+      return { success: true, count: result.modifiedCount, requested: prizeIds.length };
+    } catch (error) {
+      typedLogger.error('Failed to bulk approve prizes', { prizeIds, error });
+      throw error;
+    }
   }
 }
 

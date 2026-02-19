@@ -14,7 +14,7 @@ export interface CreatePowerUpDto {
   dropRate: number;
   maxPerSession: number;
   maxInInventory: number;
-  effects: any;
+  effects: IPowerUp['effects'];
   notes?: string;
 }
 
@@ -27,7 +27,7 @@ export interface UpdatePowerUpDto {
   dropRate?: number;
   maxPerSession?: number;
   maxInInventory?: number;
-  effects?: any;
+  effects?: IPowerUp['effects'];
   enabled?: boolean;
   notes?: string;
 }
@@ -107,14 +107,14 @@ export class PowerUpAdminService {
   }): Promise<IPowerUp[]> {
     try {
       const cacheKey = `${this.POWER_UPS_CACHE_KEY}:${JSON.stringify(filters || {})}`;
-      
+
       // Try cache first
-      const cached = await CacheService.get(cacheKey);
+      const cached = await CacheService.get(cacheKey) as string | null;
       if (cached) {
         return JSON.parse(cached);
       }
 
-      const query: any = {};
+      const query: Record<string, unknown> = {};
       if (filters?.enabled !== undefined) query.enabled = filters.enabled;
       if (filters?.type) query.type = filters.type;
       if (filters?.rarity) query.rarity = filters.rarity;
@@ -145,9 +145,9 @@ export class PowerUpAdminService {
   static async getPowerUpById(powerUpId: string | Types.ObjectId): Promise<IPowerUp> {
     try {
       const cacheKey = this.POWER_UP_CACHE_KEY(powerUpId.toString());
-      
+
       // Try cache first
-      const cached = await CacheService.get(cacheKey);
+      const cached = await CacheService.get(cacheKey) as string | null;
       if (cached) {
         return JSON.parse(cached);
       }
@@ -194,7 +194,7 @@ export class PowerUpAdminService {
       // Validate effects if provided
       const existingPowerUp = await this.getPowerUpById(powerUpId);
       if (data.effects) {
-        const typeToValidate = (data as any).type || existingPowerUp.type;
+        const typeToValidate = (data as Record<string, unknown>).type as string || existingPowerUp.type;
         this.validateEffects(typeToValidate, data.effects);
       }
 
@@ -261,7 +261,7 @@ export class PowerUpAdminService {
   ): Promise<void> {
     try {
       const result = await PowerUpModel.findByIdAndDelete(powerUpId);
-      
+
       if (!result) {
         throw new Error(`PowerUp not found: ${powerUpId}`);
       }
@@ -282,7 +282,7 @@ export class PowerUpAdminService {
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
-    
+
     }
   }
 
@@ -290,99 +290,91 @@ export class PowerUpAdminService {
    * Get power-up analytics
    */
   static async getPowerUpAnalytics(powerUpId: string | Types.ObjectId) {
-    try {
-      const powerUp = await this.getPowerUpById(powerUpId);
+    const powerUp = await this.getPowerUpById(powerUpId);
 
-      // Calculate metrics
-      const claimRate =
-        powerUp.totalCreated > 0
-          ? (powerUp.totalClaimed / powerUp.totalCreated) * 100
-          : 0;
-      const adoptionRate = 
-        powerUp.totalClaimed > 0 
-          ? (powerUp.activeInstances / powerUp.totalClaimed) * 100 
-          : 0;
+    // Calculate metrics
+    const claimRate =
+      powerUp.totalCreated > 0
+        ? (powerUp.totalClaimed / powerUp.totalCreated) * 100
+        : 0;
+    const adoptionRate =
+      powerUp.totalClaimed > 0
+        ? (powerUp.activeInstances / powerUp.totalClaimed) * 100
+        : 0;
 
-      return {
-        powerUpId: powerUp._id,
-        name: powerUp.name,
-        type: powerUp.type,
-        rarity: powerUp.rarity,
-        stats: {
-          totalCreated: powerUp.totalCreated,
-          totalClaimed: powerUp.totalClaimed,
-          activeInstances: powerUp.activeInstances,
-          usageCount: powerUp.usageCount,
-        },
-        metrics: {
-          claimRate: Math.round(claimRate * 100) / 100,
-          adoptionRate: Math.round(adoptionRate * 100) / 100,
-          averageUsagePerSession: Math.round(powerUp.averageUsagePerSession * 100) / 100,
-        },
-        configuration: {
-          enabled: powerUp.enabled,
-          dropRate: powerUp.dropRate,
-          durationMs: powerUp.durationMs,
-          maxPerSession: powerUp.maxPerSession,
-          maxInInventory: powerUp.maxInInventory,
-        },
-      };
-    } catch (error) {
-      throw error;
-    }
+    return {
+      powerUpId: powerUp._id,
+      name: powerUp.name,
+      type: powerUp.type,
+      rarity: powerUp.rarity,
+      stats: {
+        totalCreated: powerUp.totalCreated,
+        totalClaimed: powerUp.totalClaimed,
+        activeInstances: powerUp.activeInstances,
+        usageCount: powerUp.usageCount,
+      },
+      metrics: {
+        claimRate: Math.round(claimRate * 100) / 100,
+        adoptionRate: Math.round(adoptionRate * 100) / 100,
+        averageUsagePerSession: Math.round(powerUp.averageUsagePerSession * 100) / 100,
+      },
+      configuration: {
+        enabled: powerUp.enabled,
+        dropRate: powerUp.dropRate,
+        durationMs: powerUp.durationMs,
+        maxPerSession: powerUp.maxPerSession,
+        maxInInventory: powerUp.maxInInventory,
+      },
+    };
   }
 
   /**
    * Get all power-ups analytics
    */
   static async getAllPowerUpsAnalytics() {
-    try {
-      const powerUps = await this.getAllPowerUps({ enabled: true });
-      
-      const analytics = await Promise.all(
-        powerUps.map(pu => this.getPowerUpAnalytics(pu._id))
-      );
+    const powerUps = await this.getAllPowerUps({ enabled: true });
 
-      const summary = {
-        totalPowerUps: analytics.length,
-        totalCreated: analytics.reduce((sum, a) => sum + a.stats.totalCreated, 0),
-        totalClaimed: analytics.reduce((sum, a) => sum + a.stats.totalClaimed, 0),
-        totalActiveInstances: analytics.reduce((sum, a) => sum + a.stats.activeInstances, 0),
-        totalUsageCount: analytics.reduce((sum, a) => sum + a.stats.usageCount, 0),
-        averageClaimRate: Math.round(
-          analytics.reduce((sum, a) => sum + a.metrics.claimRate, 0) / analytics.length * 100
-        ) / 100,
-        averageAdoptionRate: Math.round(
-          analytics.reduce((sum, a) => sum + a.metrics.adoptionRate, 0) / analytics.length * 100
-        ) / 100,
-        byRarity: {
-          common: analytics.filter(a => a.rarity === 'common').length,
-          rare: analytics.filter(a => a.rarity === 'rare').length,
-          epic: analytics.filter(a => a.rarity === 'epic').length,
-          legendary: analytics.filter(a => a.rarity === 'legendary').length,
-        },
-        byType: {
-          radar_boost: analytics.filter(a => a.type === 'radar_boost').length,
-          double_points: analytics.filter(a => a.type === 'double_points').length,
-          speed_boost: analytics.filter(a => a.type === 'speed_boost').length,
-          shield: analytics.filter(a => a.type === 'shield').length,
-          time_extension: analytics.filter(a => a.type === 'time_extension').length,
-        },
-      };
+    const analytics = await Promise.all(
+      powerUps.map(pu => this.getPowerUpAnalytics(pu._id))
+    );
 
-      return {
-        summary,
-        powerUps: analytics,
-      };
-    } catch (error) {
-      throw error;
-    }
+    const summary = {
+      totalPowerUps: analytics.length,
+      totalCreated: analytics.reduce((sum, a) => sum + a.stats.totalCreated, 0),
+      totalClaimed: analytics.reduce((sum, a) => sum + a.stats.totalClaimed, 0),
+      totalActiveInstances: analytics.reduce((sum, a) => sum + a.stats.activeInstances, 0),
+      totalUsageCount: analytics.reduce((sum, a) => sum + a.stats.usageCount, 0),
+      averageClaimRate: Math.round(
+        analytics.reduce((sum, a) => sum + a.metrics.claimRate, 0) / analytics.length * 100
+      ) / 100,
+      averageAdoptionRate: Math.round(
+        analytics.reduce((sum, a) => sum + a.metrics.adoptionRate, 0) / analytics.length * 100
+      ) / 100,
+      byRarity: {
+        common: analytics.filter(a => a.rarity === 'common').length,
+        rare: analytics.filter(a => a.rarity === 'rare').length,
+        epic: analytics.filter(a => a.rarity === 'epic').length,
+        legendary: analytics.filter(a => a.rarity === 'legendary').length,
+      },
+      byType: {
+        radar_boost: analytics.filter(a => a.type === 'radar_boost').length,
+        double_points: analytics.filter(a => a.type === 'double_points').length,
+        speed_boost: analytics.filter(a => a.type === 'speed_boost').length,
+        shield: analytics.filter(a => a.type === 'shield').length,
+        time_extension: analytics.filter(a => a.type === 'time_extension').length,
+      },
+    };
+
+    return {
+      summary,
+      powerUps: analytics,
+    };
   }
 
   /**
    * Validate power-up effects based on type
    */
-  private static validateEffects(type: string, effects: any) {
+  private static validateEffects(type: string, effects: IPowerUp['effects']) {
     if (!effects) {
       throw new Error('Effects are required');
     }

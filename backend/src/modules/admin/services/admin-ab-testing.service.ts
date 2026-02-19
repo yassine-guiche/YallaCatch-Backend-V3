@@ -37,7 +37,7 @@ export class ABTestingService {
 
   static async getTests(filters?: { status?: string; type?: string }) {
     try {
-      const query: any = {};
+      const query: Record<string, unknown> = {};
       if (filters?.status) query.status = filters.status;
       if (filters?.type) query.type = filters.type;
 
@@ -228,7 +228,7 @@ export class ABTestingService {
     }
   }
 
-  private static calculateChiSquare(variant1: any, variant2: any): number {
+  private static calculateChiSquare(variant1: IABTest['variants'][number], variant2: IABTest['variants'][number]): number {
     const control = {
       conversions: variant1.conversions,
       nonConversions: variant1.impressions - variant1.conversions
@@ -248,7 +248,7 @@ export class ABTestingService {
     const expectedControl = (control.conversions + control.nonConversions) * (totalConversions / totalSamples);
     const expectedTest = (test.conversions + test.nonConversions) * (totalConversions / totalSamples);
 
-    const chi2 = 
+    const chi2 =
       Math.pow(control.conversions - expectedControl, 2) / (expectedControl || 1) +
       Math.pow(test.conversions - expectedTest, 2) / (expectedTest || 1);
 

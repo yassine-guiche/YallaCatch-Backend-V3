@@ -26,7 +26,7 @@ interface DistributionData {
 
 interface BulkDistributionData {
   prizes?: DistributionData[];
-  template?: any;
+  template?: Record<string, any>;
   locations?: Array<{ latitude: number; longitude: number; city?: string; address?: string; radius?: number }>;
   distributionMode?: string;
   region?: string;
@@ -64,12 +64,12 @@ const toPrizePayload = (
     payload.location?.lng ??
     payload.location?.longitude ??
     10.1815;
-  
+
   // Clamp coordinates to Tunisia bounds to prevent out-of-bounds errors
   const clamped = clampToTunisia({ lat: rawLat, lng: rawLng });
   const lat = clamped.lat;
   const lng = clamped.lng;
-  
+
   const city =
     payload.location?.city ||
     payload.city ||
@@ -143,7 +143,7 @@ export class DistributionService {
     return this.getDistributionSettings();
   }
 
-  static updateSettings(adminId: string, settings: Record<string, any>) {
+  static updateSettings(adminId: string, settings: Record<string, unknown>) {
     return this.updateDistributionSettings(adminId, settings);
   }
 
@@ -356,7 +356,7 @@ export class DistributionService {
         prizes: prizes.map((p) => p._id),
         createdBy: new Types.ObjectId(adminId),
         status: 'active',
-        metadata: { 
+        metadata: {
           autoConfig: autoData,
           totalValue: autoData.totalValue,
           region: `${autoData.region.center.lat},${autoData.region.center.lng}`,
@@ -470,7 +470,7 @@ export class DistributionService {
         distributions.map(async (dist) => {
           const distAny = dist as any;
           const prizeIds = distAny.prizes || [];
-          
+
           // Defensive: ensure Prize model is available
           let prizes: any[] = [];
           if (Prize && typeof Prize.find === 'function' && prizeIds.length > 0) {
@@ -480,7 +480,7 @@ export class DistributionService {
               typedLogger.warn('Failed to fetch prizes for distribution', { distributionId: distAny._id, err });
             }
           }
-          
+
           const claimedCount = Array.isArray(prizes) ? prizes.filter((p) => (p as any).status === 'claimed').length : 0;
           const activeCount = Array.isArray(prizes) ? prizes.filter((p) => (p as any).status === 'active').length : 0;
 
@@ -512,7 +512,7 @@ export class DistributionService {
     adminId: string,
     distributionId: string,
     action: string,
-    params?: Record<string, any>
+    params?: Record<string, unknown>
   ) {
     try {
       const distribution = await Distribution.findById(distributionId);
@@ -536,13 +536,14 @@ export class DistributionService {
           );
           break;
 
-        case 'extend':
-          const extensionHours = params?.hours || 24;
+        case 'extend': {
+          const extensionHours = (params?.hours as number) || 24;
           await Prize.updateMany(
             { _id: { $in: distAny.prizes || [] } },
             { $inc: { expiresAt: extensionHours * 60 * 60 * 1000 } }
           );
           break;
+        }
 
         case 'terminate':
           distAny.status = DistributionStatus.CANCELLED;
@@ -570,7 +571,7 @@ export class DistributionService {
   static async getDistributionHistory(page: number = 1, limit: number = 20, status?: string) {
     try {
       const skip = (page - 1) * limit;
-      const query: any = {};
+      const query: Record<string, unknown> = {};
       if (status) query.status = status;
 
       const [distributions, total] = await Promise.all([
@@ -626,7 +627,7 @@ export class DistributionService {
     }
   }
 
-  static async updateDistributionSettings(adminId: string, settings: Record<string, any>) {
+  static async updateDistributionSettings(adminId: string, settings: Record<string, unknown>) {
     try {
       const cacheKey = 'distribution:settings';
       await redisClient.setex(cacheKey, 3600, JSON.stringify(settings));
@@ -638,7 +639,7 @@ export class DistributionService {
     }
   }
 
-  static async triggerManualDistribution(adminId: string, type: string, config: Record<string, any>) {
+  static async triggerManualDistribution(adminId: string, type: string, config: Record<string, unknown>) {
     try {
       const distribution = await Distribution.create({
         type,
@@ -734,9 +735,9 @@ export class DistributionService {
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLng / 2) *
-        Math.sin(dLng / 2);
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   }

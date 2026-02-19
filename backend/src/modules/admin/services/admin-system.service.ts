@@ -10,7 +10,7 @@ export class AdminSystemService {
     const mongoStatus = mongoose.connection.readyState === 1 ? 'healthy' : 'error';
     let redisStatus = 'error';
     let redisMemory = 'N/A';
-    
+
     try {
       const info = await redisClient.info('memory');
       redisStatus = 'healthy';
@@ -166,7 +166,7 @@ export class AdminSystemService {
     const loadAvg = os.loadavg();
     const cores = cpus.length;
     const usage = cores > 0 ? Math.min(Math.round((loadAvg[0] / cores) * 100), 100) : 0;
-    
+
     return {
       cores,
       model: cpus[0]?.model || 'unknown',
@@ -176,13 +176,12 @@ export class AdminSystemService {
   }
 
   private static getDiskStats() {
-    // For now return placeholder - in production use diskusage package
-    const totalMem = os.totalmem();
-    const freeMem = os.freemem();
+    // Disk usage monitoring requires 'diskusage' or 'check-disk-space' package
+    // Returning N/A to avoid incorrect reporting via RAM stats
     return {
-      used: `${Math.round((totalMem - freeMem) / 1024 / 1024 / 1024)} GB`,
-      total: `${Math.round(totalMem / 1024 / 1024 / 1024)} GB`,
-      percentage: Math.round(((totalMem - freeMem) / totalMem) * 100)
+      used: 'N/A',
+      total: 'N/A',
+      percentage: 0
     };
   }
 
@@ -192,7 +191,7 @@ export class AdminSystemService {
     return {
       incoming: 'N/A',
       outgoing: 'N/A',
-      latency: `${Math.round(Math.random() * 10 + 5)}ms`, // Placeholder
+      latency: 'N/A',
       interfaces: interfaces.length
     };
   }

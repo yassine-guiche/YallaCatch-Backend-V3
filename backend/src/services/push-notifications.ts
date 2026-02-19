@@ -247,18 +247,16 @@ export class PushNotificationService {
     payload: PushNotificationPayload
   ): Promise<PushNotificationResult> {
     if (!this.fcmEnabled) {
-      // Mock mode for development
-      typedLogger.info('[MOCK] FCM notification sent', {
+      typedLogger.warn('FCM not configured, cannot send notification', {
         deviceId: device.deviceId,
-        platform: device.platform,
-        payload,
+        platform: device.platform
       });
 
       return {
-        success: true,
+        success: false,
         deviceId: device.deviceId,
         platform: device.platform,
-        messageId: `mock-fcm-${Date.now()}`,
+        error: 'FCM_NOT_CONFIGURED',
       };
     }
 
@@ -302,22 +300,16 @@ export class PushNotificationService {
       }
 
       // In production, use Firebase Admin SDK:
-      // const admin = require('firebase-admin');
-      // const response = await admin.messaging().send(message);
-      // return { success: true, deviceId: device.deviceId, platform: device.platform, messageId: response };
-
-      // For now, mock the response
-      typedLogger.info('[MOCK] FCM notification would be sent', {
-        deviceId: device.deviceId,
-        message,
-      });
+      const admin = require('firebase-admin');
+      const response = await admin.messaging().send(message);
 
       return {
         success: true,
         deviceId: device.deviceId,
         platform: device.platform,
-        messageId: `mock-fcm-${Date.now()}`,
+        messageId: response
       };
+
     } catch (error: any) {
       typedLogger.error('FCM send error', {
         deviceId: device.deviceId,
@@ -341,18 +333,16 @@ export class PushNotificationService {
     payload: PushNotificationPayload
   ): Promise<PushNotificationResult> {
     if (!this.apnsEnabled) {
-      // Mock mode for development
-      typedLogger.info('[MOCK] APNS notification sent', {
+      typedLogger.warn('APNS not configured, cannot send notification', {
         deviceId: device.deviceId,
-        platform: device.platform,
-        payload,
+        platform: device.platform
       });
 
       return {
-        success: true,
+        success: false,
         deviceId: device.deviceId,
         platform: device.platform,
-        messageId: `mock-apns-${Date.now()}`,
+        error: 'APNS_NOT_CONFIGURED',
       };
     }
 
@@ -378,24 +368,20 @@ export class PushNotificationService {
       };
 
       // In production, use node-apn or similar:
-      // const apn = require('apn');
-      // const provider = new apn.Provider({ ... });
+      const apn = require('apn');
+      // Assuming provider is initialized elsewhere or here if not singleton
+      // const provider = new apn.Provider({ ... }); 
+      // This part would need actual initialization code, but we certainly remove the Mock Logic
+
+      // Since we don't have the provider init code, we'll throw if it gets here without it
+      // but strictly respecting "No Mock" means we don't pretend success.
+
+      throw new Error('APNS_PROVIDER_NOT_INITIALIZED');
+
       // const notification = new apn.Notification(message.payload);
       // const response = await provider.send(notification, message.deviceToken);
       // return { success: response.sent.length > 0, deviceId: device.deviceId, platform: device.platform };
 
-      // For now, mock the response
-      typedLogger.info('[MOCK] APNS notification would be sent', {
-        deviceId: device.deviceId,
-        message,
-      });
-
-      return {
-        success: true,
-        deviceId: device.deviceId,
-        platform: device.platform,
-        messageId: `mock-apns-${Date.now()}`,
-      };
     } catch (error: any) {
       typedLogger.error('APNS send error', {
         deviceId: device.deviceId,

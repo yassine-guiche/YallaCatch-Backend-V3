@@ -1,0 +1,4 @@
+﻿src/modules/rewards/rewards.service.ts(765,32): error TS2339: Property 'points' does not exist on type 'Document<unknown, {}, ICode, {}, {}> & ICode & Required<{ _id: ObjectId; }> & { __v: number; }'.
+src/modules/rewards/rewards.service.ts(767,56): error TS2554: Expected 2 arguments, but got 4.
+src/modules/rewards/routes.ts(79,75): error TS2345: Argument of type '{ code?: string; }' is not assignable to parameter of type '{ code: string; }'.
+  Property 'code' is optional in type '{ code?: string; }' but required in type '{ code: string; }'.

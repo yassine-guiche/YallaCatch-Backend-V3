@@ -1,8 +1,8 @@
 import { RedisCache, RedisRateLimit, redisClient } from '@/config/redis';
 import { config, GAME_CONSTANTS } from '@/config';
-import { logger, logSecurity } from '@/lib/logger';
+import { logSecurity } from '@/lib/logger';
 import { typedLogger } from '@/lib/typed-logger';
-import { calculateGeodesicDistance, calculateSpeed, msToKmh } from './geo';
+import { calculateGeodesicDistance, msToKmh } from './geo';
 import { Coordinates } from '@/types';
 
 // Anti-cheat configuration
@@ -36,6 +36,17 @@ interface LocationEntry {
   accuracy?: number;
 }
 
+// User patterns interface
+interface UserPatterns {
+  regularityScore: number;
+  impossibleTravelCount: number;
+  unusualLocationScore: number;
+  timeAnomalyScore: number;
+  totalLocations: number;
+  averageDistance: number;
+  averageSpeed: number;
+}
+
 // Anti-cheat violation types
 export enum ViolationType {
   SPEED_VIOLATION = 'speed_violation',
@@ -54,7 +65,7 @@ export interface AntiCheatResult {
   allowed: boolean;
   violations: ViolationType[];
   riskScore: number;
-  details: Record<string, any>;
+  details: Record<string, unknown>;
 }
 
 /**
@@ -66,7 +77,7 @@ export async function validateAntiCheat(
   deviceSignals?: DeviceSignals
 ): Promise<AntiCheatResult> {
   const violations: ViolationType[] = [];
-  const details: Record<string, any> = {};
+  const details: Record<string, unknown> = {};
   let riskScore = 0;
 
   try {
@@ -161,7 +172,7 @@ export async function validateAntiCheat(
 
   } catch (error) {
     typedLogger.error('Anti-cheat validation error', {
-      error: (error as any).message,
+      error: error instanceof Error ? error.message : String(error),
       userId,
       location,
     });
@@ -203,10 +214,10 @@ export async function validateCooldowns(userId: string, city?: string): Promise<
       await RedisCache.set(keyCity, { at: now }, Math.ceil(ANTI_CHEAT_CONFIG.CITY_COOLDOWN_MS / 1000));
     }
   } catch (error) {
-    if (error instanceof Error && (error as any).message === 'COOLDOWN_ACTIVE') {
+    if (error instanceof Error && error.message === 'COOLDOWN_ACTIVE') {
       throw error;
     }
-    typedLogger.error('Cooldown validation error', { error: (error as any).message, userId, city });
+    typedLogger.error('Cooldown validation error', { error: error instanceof Error ? error.message : String(error), userId, city });
     throw new Error('COOLDOWN_ACTIVE');
   }
 }
@@ -218,7 +229,7 @@ async function validateSpeed(
   userId: string,
   location: Coordinates,
   deviceSignals?: DeviceSignals
-): Promise<{ valid: boolean; riskScore: number; details: any }> {
+): Promise<{ valid: boolean; riskScore: number; details: Record<string, unknown> }> {
   try {
     // Check device-reported speed first
     if (deviceSignals?.speed && deviceSignals.speed > ANTI_CHEAT_CONFIG.MAX_SPEED_MS) {
@@ -237,7 +248,7 @@ async function validateSpeed(
     const lastLocation = await getLastLocation(userId);
     if (lastLocation) {
       const timeDiff = (Date.now() - lastLocation.timestamp.getTime()) / 1000; // seconds
-      
+
       if (timeDiff < ANTI_CHEAT_CONFIG.MIN_TIME_BETWEEN_LOCATIONS) {
         return {
           valid: false,
@@ -270,7 +281,7 @@ async function validateSpeed(
 
     return { valid: true, riskScore: 0, details: {} };
   } catch (error) {
-    typedLogger.error('Speed validation error', { error: (error as any).message, userId });
+    typedLogger.error('Speed validation error', { error: error instanceof Error ? error.message : String(error), userId });
     return { valid: false, riskScore: 25, details: { error: 'validation_failed' } };
   }
 }
@@ -280,7 +291,7 @@ async function validateSpeed(
  */
 async function validateMockLocation(
   deviceSignals?: DeviceSignals
-): Promise<{ valid: boolean; riskScore: number; details: any }> {
+): Promise<{ valid: boolean; riskScore: number; details: Record<string, unknown> }> {
   if (deviceSignals?.mockLocation === true) {
     return {
       valid: false,
@@ -320,7 +331,7 @@ async function validateMockLocation(
 /**
  * Validate daily claims limit using Redis counters
  */
-async function validateDailyLimit(userId: string): Promise<{ valid: boolean; riskScore: number; details: any }> {
+async function validateDailyLimit(userId: string): Promise<{ valid: boolean; riskScore: number; details: Record<string, unknown> }> {
   try {
     const now = new Date();
     const y = now.getUTCFullYear();
@@ -344,7 +355,7 @@ async function validateDailyLimit(userId: string): Promise<{ valid: boolean; ris
     }
     return { valid: true, riskScore: 0, details: { count, limit } };
   } catch (error) {
-    typedLogger.error('Daily limit validation error', { error: (error as any).message, userId });
+    typedLogger.error('Daily limit validation error', { error: error instanceof Error ? error.message : String(error), userId });
     // Fail-open here; anti-cheat overall will still include other checks
     return { valid: true, riskScore: 0, details: { error: 'validation_failed' } };
   }
@@ -356,7 +367,7 @@ async function validateDailyLimit(userId: string): Promise<{ valid: boolean; ris
 async function validateTeleportation(
   userId: string,
   location: Coordinates
-): Promise<{ valid: boolean; riskScore: number; details: any }> {
+): Promise<{ valid: boolean; riskScore: number; details: Record<string, unknown> }> {
   try {
     const lastLocation = await getLastLocation(userId);
     if (!lastLocation) {
@@ -382,7 +393,7 @@ async function validateTeleportation(
 
     return { valid: true, riskScore: 0, details: {} };
   } catch (error) {
-    typedLogger.error('Teleportation validation error', { error: (error as any).message, userId });
+    typedLogger.error('Teleportation validation error', { error: error instanceof Error ? error.message : String(error), userId });
     return { valid: false, riskScore: 25, details: { error: 'validation_failed' } };
   }
 }
@@ -392,7 +403,7 @@ async function validateTeleportation(
  */
 async function validateRapidClaims(
   userId: string
-): Promise<{ valid: boolean; riskScore: number; details: any }> {
+): Promise<{ valid: boolean; riskScore: number; details: Record<string, unknown> }> {
   try {
     // Check hourly rate limit
     const hourlyResult = await RedisRateLimit.checkLimit(
@@ -438,7 +449,7 @@ async function validateRapidClaims(
 
     return { valid: true, riskScore: 0, details: {} };
   } catch (error) {
-    typedLogger.error('Rapid claims validation error', { error: (error as any).message, userId });
+    typedLogger.error('Rapid claims validation error', { error: error instanceof Error ? error.message : String(error), userId });
     return { valid: false, riskScore: 25, details: { error: 'validation_failed' } };
   }
 }
@@ -448,7 +459,7 @@ async function validateRapidClaims(
  */
 async function validateLocationAccuracy(
   deviceSignals?: DeviceSignals
-): Promise<{ valid: boolean; riskScore: number; details: any }> {
+): Promise<{ valid: boolean; riskScore: number; details: Record<string, unknown> }> {
   if (!deviceSignals?.accuracy) {
     return { valid: true, riskScore: 0, details: {} };
   }
@@ -473,7 +484,7 @@ async function validateLocationAccuracy(
  */
 async function validateDeviceAttestation(
   attestationToken: string
-): Promise<{ valid: boolean; riskScore: number; details: any }> {
+): Promise<{ valid: boolean; riskScore: number; details: Record<string, unknown> }> {
   try {
     if (!config.DEVICE_ATTESTATION_REQUIRED && !attestationToken) {
       return { valid: true, riskScore: 0, details: { mode: 'not_required' } };
@@ -508,7 +519,7 @@ async function validateDeviceAttestation(
     // TODO: Implement actual attestation validation
     return { valid: true, riskScore: 0, details: { mode: 'structural_validation' } };
   } catch (error) {
-    typedLogger.error('Attestation validation error', { error: (error as any).message });
+    typedLogger.error('Attestation validation error', { error: error instanceof Error ? error.message : String(error) });
     return { valid: false, riskScore: 15, details: { error: 'validation_failed' } };
   }
 }
@@ -519,7 +530,7 @@ async function validateDeviceAttestation(
 async function analyzeUserPatterns(
   userId: string,
   location: Coordinates
-): Promise<{ valid: boolean; riskScore: number; details: any }> {
+): Promise<{ valid: boolean; riskScore: number; details: Record<string, unknown> }> {
   try {
     const patterns = await getUserPatterns(userId);
     const suspiciousIndicators = [];
@@ -554,11 +565,11 @@ async function analyzeUserPatterns(
       riskScore,
       details: {
         indicators: suspiciousIndicators,
-        patterns,
+        patterns: patterns as unknown as Record<string, unknown>,
       },
     };
   } catch (error) {
-    typedLogger.error('Pattern analysis error', { error: (error as any).message, userId });
+    typedLogger.error('Pattern analysis error', { error: error instanceof Error ? error.message : String(error), userId });
     return { valid: true, riskScore: 0, details: {} };
   }
 }
@@ -588,7 +599,7 @@ async function storeLocationHistory(
   if (history.length > 50) {
     await RedisCache.del(`location_history:${userId}`);
     await Promise.all(
-      history.slice(0, 50).map(entry => 
+      history.slice(0, 50).map(entry =>
         RedisCache.lpush(`location_history:${userId}`, entry, 24 * 60 * 60)
       )
     );
@@ -607,18 +618,21 @@ async function getLastLocation(userId: string): Promise<LocationEntry | null> {
 /**
  * Get user behavior patterns
  */
-async function getUserPatterns(userId: string): Promise<any> {
+async function getUserPatterns(userId: string): Promise<UserPatterns> {
   const historyRaw = await RedisCache.lrange<LocationEntry>(`location_history:${userId}`, 0, -1);
   const history = historyRaw
     .map(normalizeLocationEntry)
     .filter((entry): entry is LocationEntry => !!entry);
-  
+
   if (history.length < 5) {
     return {
       regularityScore: 0,
       impossibleTravelCount: 0,
       unusualLocationScore: 0,
       timeAnomalyScore: 0,
+      totalLocations: 0,
+      averageDistance: 0,
+      averageSpeed: 0,
     };
   }
 
@@ -630,16 +644,16 @@ async function getUserPatterns(userId: string): Promise<any> {
   for (let i = 1; i < history.length; i++) {
     const prev = history[i - 1];
     const curr = history[i];
-    
+
     const distance = calculateGeodesicDistance(prev, curr);
     const timeDiff = (curr.timestamp.getTime() - prev.timestamp.getTime()) / 1000;
-    
+
     if (timeDiff > 0) {
       const speed = distance / timeDiff;
       if (speed > ANTI_CHEAT_CONFIG.SUSPICIOUS_SPEED_THRESHOLD) {
         impossibleTravelCount++;
       }
-      
+
       totalDistance += distance;
       totalTime += timeDiff;
     }
@@ -650,7 +664,7 @@ async function getUserPatterns(userId: string): Promise<any> {
   for (let i = 1; i < history.length; i++) {
     distances.push(calculateGeodesicDistance(history[i - 1], history[i]));
   }
-  
+
   const avgDistance = distances.reduce((a, b) => a + b, 0) / distances.length;
   const variance = distances.reduce((a, b) => a + Math.pow(b - avgDistance, 2), 0) / distances.length;
   const regularityScore = variance === 0 ? 1 : Math.max(0, 1 - (Math.sqrt(variance) / avgDistance));
@@ -669,10 +683,10 @@ async function getUserPatterns(userId: string): Promise<any> {
 /**
  * Get anti-cheat statistics for monitoring
  */
-export async function getAntiCheatStats(): Promise<any> {
+export async function getAntiCheatStats(): Promise<Record<string, unknown>> {
   // This would return aggregated statistics about anti-cheat violations
   // for monitoring and tuning purposes
-  
+
   return {
     totalViolations: 0,
     violationsByType: {},
@@ -702,24 +716,28 @@ export async function resetUserAntiCheatData(userId: string): Promise<void> {
       await redisClient.del(...cityKeys);
     }
   } catch (err) {
-    typedLogger.error('Anti-cheat reset city cooldown error', { userId, error: (err as any).message });
+    typedLogger.error('Anti-cheat reset city cooldown error', { userId, error: err instanceof Error ? err.message : String(err) });
   }
-  
+
   typedLogger.info('User anti-cheat data reset', { userId });
 }
 
-function normalizeLocationEntry(raw: any): LocationEntry | null {
-  if (!raw || typeof raw.lat !== 'number' || typeof raw.lng !== 'number') {
+function normalizeLocationEntry(raw: unknown): LocationEntry | null {
+  if (!raw || typeof raw !== 'object') {
     return null;
   }
-  const timestamp = raw.timestamp instanceof Date ? raw.timestamp : new Date(raw.timestamp);
+  const entry = raw as Record<string, unknown>;
+  if (typeof entry.lat !== 'number' || typeof entry.lng !== 'number') {
+    return null;
+  }
+  const timestamp = entry.timestamp instanceof Date ? entry.timestamp : new Date(entry.timestamp as string | number);
   if (Number.isNaN(timestamp.getTime())) {
     return null;
   }
   return {
-    lat: raw.lat,
-    lng: raw.lng,
+    lat: entry.lat as number,
+    lng: entry.lng as number,
     timestamp,
-    accuracy: raw.accuracy,
+    accuracy: entry.accuracy as number | undefined,
   };
 }

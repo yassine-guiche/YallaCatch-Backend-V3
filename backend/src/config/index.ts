@@ -108,7 +108,8 @@ const envSchema = z.object({
 
   // Game Configuration
   GAME_MAX_DAILY_CLAIMS: z.coerce.number().default(50),
-  GAME_CLAIM_RADIUS_METERS: z.coerce.number().default(50),
+  GAME_CLAIM_RADIUS_METERS: z.coerce.number().default(20),
+  GAME_REFERRAL_POINTS: z.coerce.number().default(100),
   GAME_SPEED_LIMIT_KMH: z.coerce.number().default(120),
   GAME_COOLDOWN_SECONDS: z.coerce.number().default(60),
   GAME_LEVEL_UP_MULTIPLIER: z.coerce.number().default(1.5),
@@ -146,7 +147,6 @@ const envSchema = z.object({
   // Development Configuration
   DEBUG_MODE: z.coerce.boolean().default(false),
   SEED_DATABASE: z.coerce.boolean().default(false),
-  MOCK_EXTERNAL_SERVICES: z.coerce.boolean().default(false),
   DEVICE_ATTESTATION_REQUIRED: z.coerce.boolean().default(false),
 
   // Testing Configuration

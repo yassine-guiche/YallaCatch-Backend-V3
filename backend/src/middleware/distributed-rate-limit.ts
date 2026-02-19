@@ -1,9 +1,8 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
+import { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { RateLimiterRedis, RateLimiterRes } from 'rate-limiter-flexible';
 import { redisClient } from '@/config/redis';
-import { logger, logSecurity } from '@/lib/logger';
+import { logSecurity } from '@/lib/logger';
 import { typedLogger } from '@/lib/typed-logger';
-import { config } from '@/config';
 
 /**
  * Distributed rate limiter configurations
@@ -48,53 +47,53 @@ function ensureLimiters() {
     throw new Error('Redis client not initialized for rate limiting');
   }
   limiters = {
-  // Global IP-based rate limiting
-  global: createRateLimiter({
-    keyPrefix: 'global_rate_limit',
-    points: 1000, // 1000 requests (increased for dev)
-    duration: 900, // per 15 minutes
-    blockDuration: 60, // block for 1 minute only
-  }),
+    // Global IP-based rate limiting
+    global: createRateLimiter({
+      keyPrefix: 'global_rate_limit',
+      points: 1000, // 1000 requests (increased for dev)
+      duration: 900, // per 15 minutes
+      blockDuration: 60, // block for 1 minute only
+    }),
 
-  // Authentication endpoints
-  auth: createRateLimiter({
-    keyPrefix: 'auth_rate_limit',
-    points: 20, // 20 attempts (increased for dev)
-    duration: 900, // per 15 minutes
-    blockDuration: 300, // block for 5 minutes
-  }),
+    // Authentication endpoints
+    auth: createRateLimiter({
+      keyPrefix: 'auth_rate_limit',
+      points: 20, // 20 attempts (increased for dev)
+      duration: 900, // per 15 minutes
+      blockDuration: 300, // block for 5 minutes
+    }),
 
-  // User-specific rate limiting
-  user: createRateLimiter({
-    keyPrefix: 'user_rate_limit',
-    points: 1000, // 1000 requests
-    duration: 3600, // per hour
-    blockDuration: 3600, // block for 1 hour
-  }),
+    // User-specific rate limiting
+    user: createRateLimiter({
+      keyPrefix: 'user_rate_limit',
+      points: 1000, // 1000 requests
+      duration: 3600, // per hour
+      blockDuration: 3600, // block for 1 hour
+    }),
 
-  // Claims (prize capture) rate limiting
-  claims: createRateLimiter({
-    keyPrefix: 'claims_rate_limit',
-    points: 50, // 50 claims
-    duration: 3600, // per hour
-    blockDuration: 1800, // block for 30 minutes
-  }),
+    // Claims (prize capture) rate limiting
+    claims: createRateLimiter({
+      keyPrefix: 'claims_rate_limit',
+      points: 50, // 50 claims
+      duration: 3600, // per hour
+      blockDuration: 1800, // block for 30 minutes
+    }),
 
-  // Admin operations
-  admin: createRateLimiter({
-    keyPrefix: 'admin_rate_limit',
-    points: 500, // 500 requests
-    duration: 3600, // per hour
-    blockDuration: 600, // block for 10 minutes
-  }),
+    // Admin operations
+    admin: createRateLimiter({
+      keyPrefix: 'admin_rate_limit',
+      points: 500, // 500 requests
+      duration: 3600, // per hour
+      blockDuration: 600, // block for 10 minutes
+    }),
 
-  // WebSocket connections
-  websocket: createRateLimiter({
-    keyPrefix: 'websocket_rate_limit',
-    points: 10, // 10 connections
-    duration: 60, // per minute
-    blockDuration: 300, // block for 5 minutes
-  }),
+    // WebSocket connections
+    websocket: createRateLimiter({
+      keyPrefix: 'websocket_rate_limit',
+      points: 10, // 10 connections
+      duration: 60, // per minute
+      blockDuration: 300, // block for 5 minutes
+    }),
   };
   return limiters;
 }
@@ -114,10 +113,10 @@ export function createRateLimitMiddleware(
   return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     try {
       const key = keyExtractor(request);
-      
+
       // Try to consume a point
       const rateLimiterRes = await limiter.consume(key);
-      
+
       // Add rate limit headers
       reply.headers({
         'X-RateLimit-Limit': limiter.points,
@@ -128,7 +127,7 @@ export function createRateLimitMiddleware(
     } catch (rateLimiterRes) {
       if (rateLimiterRes instanceof RateLimiterRes) {
         const secs = Math.round(rateLimiterRes.msBeforeNext / 1000) || 1;
-        
+
         // Log rate limit exceeded
         logSecurity('rate_limit_exceeded', 'medium', {
           key: keyExtractor(request),
@@ -136,7 +135,7 @@ export function createRateLimitMiddleware(
           userAgent: request.headers['user-agent'],
           endpoint: request.url,
           method: request.method,
-          userId: (request as any).user?.sub,
+          userId: request.user?.sub,
           retryAfter: secs,
         });
 
@@ -163,7 +162,7 @@ export function createRateLimitMiddleware(
 
       // Other error
       typedLogger.error('Rate limiter error', {
-        error: rateLimiterRes.message || rateLimiterRes,
+        error: rateLimiterRes instanceof Error ? rateLimiterRes.message : String(rateLimiterRes),
         key: keyExtractor(request),
         ip: request.ip,
       });
@@ -193,8 +192,7 @@ export const userRateLimit = async (request: FastifyRequest, reply: FastifyReply
     return;
   }
   return createRateLimitMiddleware(ensureLimiters().user, (req) => {
-    const user = (req as any).user;
-    return user?.sub || req.ip;
+    return req.user?.sub || req.ip;
   })(request, reply);
 };
 
@@ -209,14 +207,14 @@ export const authRateLimit = async (request: FastifyRequest, reply: FastifyReply
   return createRateLimitMiddleware(
     ensureLimiters().auth,
     (req) => {
-      const body = req.body as any;
-      return body?.email || req.ip;
+      const body = req.body as Record<string, unknown>;
+      return typeof body?.email === 'string' ? body.email : req.ip;
     },
     {
       onLimitReached: (req, rateLimiterRes) => {
-        const body = req.body as any;
+        const body = req.body as Record<string, unknown>;
         logSecurity('auth_rate_limit_exceeded', 'high', {
-          email: body?.email,
+          email: typeof body?.email === 'string' ? body.email : undefined,
           ip: req.ip,
           userAgent: req.headers['user-agent'],
           endpoint: req.url,
@@ -239,14 +237,12 @@ export const claimsRateLimit = async (request: FastifyRequest, reply: FastifyRep
   return createRateLimitMiddleware(
     ensureLimiters().claims,
     (req) => {
-      const user = (req as any).user;
-      return user?.sub || req.ip;
+      return req.user?.sub || req.ip;
     },
     {
       onLimitReached: (req, rateLimiterRes) => {
-        const user = (req as any).user;
         logSecurity('claims_rate_limit_exceeded', 'medium', {
-          userId: user?.sub,
+          userId: req.user?.sub,
           ip: req.ip,
           endpoint: req.url,
           msBeforeNext: rateLimiterRes.msBeforeNext,
@@ -267,8 +263,7 @@ export const adminRateLimit = async (request: FastifyRequest, reply: FastifyRepl
   return createRateLimitMiddleware(
     ensureLimiters().admin,
     (req) => {
-      const user = (req as any).user;
-      return `admin:${user?.sub || req.ip}`;
+      return `admin:${req.user?.sub || req.ip}`;
     }
   )(request, reply);
 };
@@ -313,7 +308,7 @@ export class AdaptiveRateLimiter {
 
   markSuspicious(userId: string): void {
     this.suspiciousUsers.add(userId);
-    
+
     // Remove after 1 hour
     setTimeout(() => {
       this.suspiciousUsers.delete(userId);
@@ -343,17 +338,18 @@ export class AdaptiveRateLimiter {
 
   createMiddleware() {
     return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
-      const user = (request as any).user;
-      const userId = user?.sub;
+      const userId = request.user?.sub;
       const ip = request.ip;
 
-      const allowed = await this.checkLimit(userId, ip);
-      
+      // Type assertion for userId is safe here because checkLimit handles undefined
+      // But checkLimit expects string, so we default to empty string if undefined (though it falls back to IP)
+      const allowed = await this.checkLimit(userId || '', ip);
+
       if (!allowed) {
         logSecurity('adaptive_rate_limit_exceeded', 'high', {
           userId,
           ip,
-          isSuspicious: this.suspiciousUsers.has(userId),
+          isSuspicious: userId ? this.suspiciousUsers.has(userId) : false,
           endpoint: request.url,
         });
 
@@ -386,7 +382,7 @@ export const getAdaptiveRateLimiter = () => {
 /**
  * Rate limiting plugin for Fastify
  */
-export default async function rateLimitPlugin(fastify: any) {
+export default async function rateLimitPlugin(fastify: FastifyInstance) {
   // Register rate limiters as decorators
   fastify.decorate('rateLimiters', limiters);
   fastify.decorate('ipRateLimit', ipRateLimit);

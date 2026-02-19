@@ -1,8 +1,8 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
+import { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { verifyToken, extractTokenFromHeader } from '@/lib/jwt';
 import { User } from '@/models/User';
 import { UserRole } from '@/types';
-import { logger, logSecurity } from '@/lib/logger';
+import { logSecurity } from '@/lib/logger';
 import { typedLogger } from '@/lib/typed-logger';
 
 // Extend FastifyRequest to include user
@@ -13,7 +13,8 @@ declare module 'fastify' {
       email?: string;
       role: string;
       deviceId?: string;
-      sessionId?: string; // Made optional to match common authentication patterns
+      partnerId?: string;
+      sessionId?: string;
       displayName?: string;
       iat?: number;
       exp?: number;
@@ -30,7 +31,7 @@ export async function authenticate(
 ): Promise<void> {
   try {
     const token = extractTokenFromHeader(request.headers.authorization);
-    
+
     if (!token) {
       return reply.code(401).send({
         success: false,
@@ -41,7 +42,7 @@ export async function authenticate(
     }
 
     const verificationResult = await verifyToken(token);
-    
+
     if (!verificationResult.valid || !verificationResult.decoded) {
       logSecurity('invalid_token_used', 'medium', {
         token: token.substring(0, 20) + '...',
@@ -49,7 +50,7 @@ export async function authenticate(
         ip: request.ip,
         userAgent: request.headers['user-agent'],
       });
-      
+
       return reply.code(401).send({
         success: false,
         error: 'INVALID_TOKEN',
@@ -60,13 +61,13 @@ export async function authenticate(
 
     // Check if user still exists and is not banned
     const user = await User.findById(verificationResult.decoded.sub);
-    
+
     if (!user) {
       logSecurity('token_for_deleted_user', 'medium', {
         userId: verificationResult.decoded.sub,
         ip: request.ip,
       });
-      
+
       return reply.code(401).send({
         success: false,
         error: 'USER_NOT_FOUND',
@@ -83,7 +84,7 @@ export async function authenticate(
           banExpiresAt: user.banExpiresAt,
           ip: request.ip,
         });
-        
+
         return reply.code(403).send({
           success: false,
           error: 'USER_BANNED',
@@ -120,11 +121,11 @@ export async function authenticate(
 
   } catch (error) {
     typedLogger.error('Authentication middleware error', {
-      error: (error as any).message,
+      error: error instanceof Error ? error.message : String(error),
       ip: request.ip,
       userAgent: request.headers['user-agent'],
     });
-    
+
     return reply.code(500).send({
       success: false,
       error: 'AUTHENTICATION_ERROR',
@@ -151,7 +152,7 @@ export async function requireAdmin(
   }
 
   const adminRoles = [UserRole.ADMIN, UserRole.MODERATOR, UserRole.SUPER_ADMIN];
-  
+
   if (!adminRoles.includes(request.user.role as UserRole)) {
     logSecurity('unauthorized_admin_access', 'high', {
       userId: request.user.sub,
@@ -160,7 +161,7 @@ export async function requireAdmin(
       method: request.method,
       ip: request.ip,
     });
-    
+
     return reply.code(403).send({
       success: false,
       error: 'INSUFFICIENT_PERMISSIONS',
@@ -194,7 +195,7 @@ export async function requireSuperAdmin(
       method: request.method,
       ip: request.ip,
     });
-    
+
     return reply.code(403).send({
       success: false,
       error: 'INSUFFICIENT_PERMISSIONS',
@@ -213,20 +214,20 @@ export async function optionalAuth(
 ): Promise<void> {
   try {
     const token = extractTokenFromHeader(request.headers.authorization);
-    
+
     if (!token) {
       return; // No token provided, continue without authentication
     }
 
     const verificationResult = await verifyToken(token);
-    
+
     if (verificationResult.valid && verificationResult.decoded) {
       // Check if user still exists
       const user = await User.findById(verificationResult.decoded.sub);
-      
+
       if (user && !user.isBanned && !user.deletedAt) {
         request.user = verificationResult.decoded;
-        
+
         // Update last active timestamp
         user.lastActive = new Date();
         await user.save();
@@ -234,7 +235,7 @@ export async function optionalAuth(
     }
   } catch (error) {
     // Silently fail for optional auth
-    typedLogger.debug('Optional auth failed', { error: (error as any).message });
+    typedLogger.debug('Optional auth failed', { error: error instanceof Error ? error.message : String(error) });
   }
 }
 
@@ -261,7 +262,7 @@ export function requireRole(allowedRoles: UserRole[]) {
         method: request.method,
         ip: request.ip,
       });
-      
+
       return reply.code(403).send({
         success: false,
         error: 'INSUFFICIENT_PERMISSIONS',
@@ -281,7 +282,7 @@ export async function validateDevice(
 ): Promise<void> {
   const deviceId = request.headers['x-device-id'] as string;
   const platform = request.headers['x-platform'] as string;
-  
+
   if (!deviceId) {
     return reply.code(400).send({
       success: false,
@@ -327,7 +328,7 @@ export async function validateDevice(
  */
 export function rateLimitByUser(maxRequests: number, windowMs: number) {
   const userRequests = new Map<string, { count: number; resetTime: number }>();
-  
+
   return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     if (!request.user) {
       return; // Skip rate limiting for unauthenticated requests
@@ -348,7 +349,7 @@ export function rateLimitByUser(maxRequests: number, windowMs: number) {
 
     if (userLimit.count >= maxRequests) {
       const retryAfter = Math.ceil((userLimit.resetTime - now) / 1000);
-      
+
       logSecurity('user_rate_limit_exceeded', 'low', {
         userId,
         endpoint: request.url,
@@ -356,7 +357,7 @@ export function rateLimitByUser(maxRequests: number, windowMs: number) {
         count: userLimit.count,
         limit: maxRequests,
       });
-      
+
       return reply.code(429).send({
         success: false,
         error: 'RATE_LIMIT_EXCEEDED',
@@ -371,7 +372,7 @@ export function rateLimitByUser(maxRequests: number, windowMs: number) {
 }
 
 // Register middleware with Fastify
-export default async function authPlugin(fastify: any) {
+export default async function authPlugin(fastify: FastifyInstance) {
   fastify.decorate('authenticate', authenticate);
   fastify.decorate('requireAdmin', requireAdmin);
   fastify.decorate('requireSuperAdmin', requireSuperAdmin);

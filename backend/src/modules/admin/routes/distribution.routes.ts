@@ -91,7 +91,9 @@ const sanitizePrizeConfig = (cfg: z.infer<typeof PrizeConfigSchema>, loc: z.infe
   const type = Object.values(PrizeType).includes(cfg.type) ? cfg.type : PrizeType.PHYSICAL;
   const category = Object.values(PrizeCategory).includes(cfg.category) ? cfg.category : PrizeCategory.LIFESTYLE;
   const rarity = Object.values(PrizeRarity).includes(cfg.rarity) ? cfg.rarity : PrizeRarity.COMMON;
-  const points = Math.max(1, Number((cfg.content as any)?.points ?? (cfg as any).points ?? 0));
+  const contentRecord = (cfg.content || {}) as Record<string, unknown>;
+  const cfgRecord = cfg as Record<string, unknown>;
+  const points = Math.max(1, Number(contentRecord.points ?? cfgRecord.points ?? 0));
 
   return {
     name: cfg.title,
@@ -128,9 +130,9 @@ export default async function distributionRoutes(fastify: FastifyInstance) {
   fastify.addHook('onRequest', requireAdmin);
   fastify.addHook('onRequest', adminRateLimit);
 
-  fastify.post('/place', async (request: FastifyRequest, reply) => {
+  fastify.post<{ Body: z.infer<typeof SingleDistributionSchema> }>('/place', async (request, reply) => {
     const body = SingleDistributionSchema.parse(request.body);
-    const adminId = String((request as any).user?.sub || (request as any).userId);
+    const adminId = String(request.user?.sub);
     const location = sanitizeLocation(body.location);
     const prizeConfig = sanitizePrizeConfig(body.prizeConfig, location);
 
@@ -157,8 +159,8 @@ export default async function distributionRoutes(fastify: FastifyInstance) {
         location,
         ...(body.metadata || {}),
       },
-    } as any);
-    
+    } as Record<string, unknown>);
+
     // Audit log
     await audit.custom({
       userId: adminId,
@@ -169,13 +171,13 @@ export default async function distributionRoutes(fastify: FastifyInstance) {
       severity: 'low',
       metadata: { location: location.city, prizeConfig },
     });
-    
+
     return reply.send(result);
   });
 
-  fastify.post('/batch', async (request: FastifyRequest, reply) => {
+  fastify.post<{ Body: z.infer<typeof BulkDistributionSchema> }>('/batch', async (request, reply) => {
     const body = BulkDistributionSchema.parse(request.body);
-    const adminId = String((request as any).user?.sub || (request as any).userId);
+    const adminId = String(request.user?.sub);
     const templateLocation = sanitizeLocation(body.locations[0]);
     const template = sanitizePrizeConfig(body.template, templateLocation);
     const locations = body.locations.map((loc) => {
@@ -194,7 +196,7 @@ export default async function distributionRoutes(fastify: FastifyInstance) {
       locations,
       distributionMode: body.distributionMode
     });
-    
+
     // Audit log
     await audit.custom({
       userId: adminId,
@@ -205,13 +207,13 @@ export default async function distributionRoutes(fastify: FastifyInstance) {
       severity: 'medium',
       metadata: { count: locations.length, template: template.name },
     });
-    
+
     return reply.send(result);
   });
 
-  fastify.post('/auto', async (request: FastifyRequest, reply) => {
+  fastify.post<{ Body: z.infer<typeof AutoDistributionSchema> }>('/auto', async (request, reply) => {
     const body = AutoDistributionSchema.parse(request.body);
-    const adminId = String((request as any).user?.sub || (request as any).userId);
+    const adminId = String(request.user?.sub);
     const centerLoc = sanitizeLocation(body.region.center);
     const prizeTemplate = sanitizePrizeConfig(body.prizeTemplate, centerLoc);
     const result = await DistributionService.autoDistributePrizes(adminId, {
@@ -223,7 +225,7 @@ export default async function distributionRoutes(fastify: FastifyInstance) {
       count: Math.max(1, Math.round(body.density)),
       densityBased: true,
     });
-    
+
     // Audit log
     await audit.custom({
       userId: adminId,
@@ -234,39 +236,40 @@ export default async function distributionRoutes(fastify: FastifyInstance) {
       severity: 'medium',
       metadata: { region: body.region, density: body.density },
     });
-    
+
     return reply.send(result);
   });
 
-  fastify.get('/distribution/analytics', async (request: FastifyRequest, reply) => {
-    const adminId = String((request as any).user?.sub || (request as any).userId);
-    const query = request.query as { timeframe?: string; startDate?: string; endDate?: string };
+  fastify.get<{ Querystring: { timeframe?: string; startDate?: string; endDate?: string } }>('/distribution/analytics', async (request, reply) => {
+    const adminId = String(request.user?.sub);
+    const query = request.query;
     const timeframe = query.timeframe || '30d';
     const result = await DistributionService.getDistributionAnalytics(adminId, timeframe, query);
     return reply.send(result);
   });
 
-  fastify.get('/distribution/active', async (request: FastifyRequest, reply) => {
-    const query = request.query as { page?: string; limit?: string };
+  fastify.get<{ Querystring: { page?: string; limit?: string } }>('/distribution/active', async (request, reply) => {
+    const query = request.query;
     const page = query.page ? parseInt(query.page) : 1;
     const limit = query.limit ? parseInt(query.limit) : 20;
-    
+
     try {
-      const adminId = String((request as any).user?.sub || (request as any).userId);
+      const adminId = String(request.user?.sub);
       const result = await DistributionService.getActiveDistributions(adminId, { page, limit });
       return reply.send(result);
-    } catch (error: any) {
-      console.error('Error in /distribution/active:', error?.message || error, error?.stack);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error in /distribution/active:', message);
       // Return empty result instead of 500 error
-      return reply.send({ 
+      return reply.send({
         items: [],
         pagination: { page, limit, total: 0, pages: 0 }
       });
     }
   });
 
-  fastify.get('/distribution/history', async (request: FastifyRequest, reply) => {
-    const query = request.query as { page?: string; limit?: string; status?: string };
+  fastify.get<{ Querystring: { page?: string; limit?: string; status?: string } }>('/distribution/history', async (request, reply) => {
+    const query = request.query;
     const result = await DistributionService.getDistributionHistory(
       query.page ? parseInt(query.page) : 1,
       query.limit ? parseInt(query.limit) : 20,
@@ -280,14 +283,14 @@ export default async function distributionRoutes(fastify: FastifyInstance) {
     return reply.send(result);
   });
 
-  fastify.put('/distribution/settings', async (request: FastifyRequest, reply) => {
+  fastify.put<{ Body: z.infer<typeof SettingsSchema> }>('/distribution/settings', async (request, reply) => {
     const body = SettingsSchema.parse(request.body);
-    const adminId = String((request as any).user?.sub || (request as any).userId);
+    const adminId = String(request.user?.sub);
     const result = await DistributionService.updateDistributionSettings(adminId, body);
-    
+
     // Audit log
     await audit.settingsUpdated(adminId, 'distribution', { metadata: { changes: Object.keys(body) } });
-    
+
     return reply.send(result);
   });
 
@@ -296,9 +299,9 @@ export default async function distributionRoutes(fastify: FastifyInstance) {
       type: z.string(),
       config: z.record(z.unknown()).optional()
     }).parse(request.body);
-    const adminId = String((request as any).user?.sub || (request as any).userId);
+    const adminId = String(request.user?.sub);
     const result = await DistributionService.triggerManualDistribution(adminId, body.type, body.config || {});
-    
+
     // Audit log
     await audit.custom({
       userId: adminId,
@@ -309,16 +312,16 @@ export default async function distributionRoutes(fastify: FastifyInstance) {
       severity: 'medium',
       metadata: { type: body.type, config: body.config },
     });
-    
+
     return reply.send(result);
   });
 
   fastify.post('/manage/:distributionId', async (request: FastifyRequest<{ Params: { distributionId: string } }>, reply) => {
     const { distributionId } = request.params;
     const body = ManageDistributionSchema.parse(request.body);
-    const adminId = String((request as any).user?.sub || (request as any).userId);
+    const adminId = String(request.user?.sub);
     const result = await DistributionService.manageDistribution(adminId, distributionId, body.action, body.params);
-    
+
     // Audit log
     await audit.custom({
       userId: adminId,
@@ -330,7 +333,43 @@ export default async function distributionRoutes(fastify: FastifyInstance) {
       severity: 'medium',
       metadata: { action: body.action, params: body.params },
     });
-    
+
     return reply.send(result);
+  });
+
+  // GET /distribution/templates — Return predefined distribution templates
+  fastify.get('/distribution/templates', async (_request, reply) => {
+    try {
+      const templates = [
+        {
+          id: 'city_center',
+          name: 'City Center Distribution',
+          description: 'Distribute prizes in a city center area with high foot traffic',
+          config: { spawnRadius: 1000, quantity: 10, maxClaims: 1, respawnInterval: 3600 },
+        },
+        {
+          id: 'event_zone',
+          name: 'Event Zone Distribution',
+          description: 'Concentrated prize distribution for events or promotions',
+          config: { spawnRadius: 500, quantity: 25, maxClaims: 1, respawnInterval: 1800 },
+        },
+        {
+          id: 'wide_area',
+          name: 'Wide Area Distribution',
+          description: 'Spread prizes across a large geographic area',
+          config: { spawnRadius: 5000, quantity: 50, maxClaims: 3, respawnInterval: 7200 },
+        },
+        {
+          id: 'daily_challenge',
+          name: 'Daily Challenge',
+          description: 'Daily time-limited prize distribution',
+          config: { spawnRadius: 2000, quantity: 15, maxClaims: 1, respawnInterval: 0 },
+        },
+      ];
+
+      return reply.send({ success: true, templates, data: templates });
+    } catch (error) {
+      return reply.status(500).send({ error: 'Failed to fetch distribution templates' });
+    }
   });
 }

@@ -9,10 +9,12 @@ const registerDeviceSchema = z.object({
   deviceId: z.string().min(1).max(100),
   platform: z.enum(['ios', 'android', 'web']),
   fcmToken: z.string().min(1),
-  apnsToken: z.string().optional()});
+  apnsToken: z.string().optional()
+});
 
 const unregisterDeviceSchema = z.object({
-  deviceId: z.string().min(1).max(100)});
+  deviceId: z.string().min(1).max(100)
+});
 
 const updatePreferencesSchema = z.object({
   deviceId: z.string().optional(),
@@ -24,7 +26,9 @@ const updatePreferencesSchema = z.object({
     dailyReminder: z.boolean().optional(),
     marketplaceDeals: z.boolean().optional(),
     eventStarted: z.boolean().optional(),
-    levelUp: z.boolean().optional()})});
+    levelUp: z.boolean().optional()
+  })
+});
 
 /**
  * Push Notification Service
@@ -41,7 +45,8 @@ export class PushNotificationService {
       // Check if device already registered
       let deviceToken = await DeviceToken.findOne({
         userId: new Types.ObjectId(userId),
-        deviceId: data.deviceId});
+        deviceId: data.deviceId
+      });
 
       if (deviceToken) {
         // Update existing token
@@ -60,24 +65,28 @@ export class PushNotificationService {
           fcmToken: data.fcmToken,
           apnsToken: data.apnsToken,
           isActive: true,
-          lastUsed: new Date()});
+          lastUsed: new Date()
+        });
         await deviceToken.save();
       }
 
       typedLogger.info('Device registered for push notifications', {
         userId,
         deviceId: data.deviceId,
-        platform: data.platform});
+        platform: data.platform
+      });
 
       return {
         deviceId: deviceToken.deviceId,
         platform: deviceToken.platform,
-        preferences: deviceToken.preferences};
-      
+        preferences: deviceToken.preferences
+      };
+
     } catch (error: any) {
       typedLogger.error('Register device error', {
         userId,
-        error: (error as any).message});
+        error: (error as any).message
+      });
       throw error;
     }
   }
@@ -92,7 +101,8 @@ export class PushNotificationService {
     try {
       const deviceToken = await DeviceToken.findOne({
         userId: new Types.ObjectId(userId),
-        deviceId: data.deviceId});
+        deviceId: data.deviceId
+      });
 
       if (!deviceToken) {
         throw new Error('DEVICE_NOT_FOUND');
@@ -103,15 +113,18 @@ export class PushNotificationService {
 
       typedLogger.info('Device unregistered from push notifications', {
         userId,
-        deviceId: data.deviceId});
+        deviceId: data.deviceId
+      });
 
       return {
-        message: 'Device unregistered successfully'};
-      
+        message: 'Device unregistered successfully'
+      };
+
     } catch (error: any) {
       typedLogger.error('Unregister device error', {
         userId,
-        error: (error as any).message});
+        error: (error as any).message
+      });
       throw error;
     }
   }
@@ -126,7 +139,8 @@ export class PushNotificationService {
     try {
       const query: any = {
         userId: new Types.ObjectId(userId),
-        isActive: true};
+        isActive: true
+      };
 
       if (data.deviceId) {
         query.deviceId = data.deviceId;
@@ -147,16 +161,19 @@ export class PushNotificationService {
       typedLogger.info('Notification preferences updated', {
         userId,
         deviceId: data.deviceId || 'all',
-        preferences: data.preferences});
+        preferences: data.preferences
+      });
 
       return {
         updated: deviceTokens.length,
-        preferences: deviceTokens[0].preferences};
-      
+        preferences: deviceTokens[0].preferences
+      };
+
     } catch (error: any) {
       typedLogger.error('Update preferences error', {
         userId,
-        error: (error as any).message});
+        error: (error as any).message
+      });
       throw error;
     }
   }
@@ -168,7 +185,8 @@ export class PushNotificationService {
     try {
       const query: any = {
         userId: new Types.ObjectId(userId),
-        isActive: true};
+        isActive: true
+      };
 
       if (deviceId) {
         query.deviceId = deviceId;
@@ -188,7 +206,9 @@ export class PushNotificationService {
             dailyReminder: true,
             marketplaceDeals: true,
             eventStarted: true,
-            levelUp: true}};
+            levelUp: true
+          }
+        };
       }
 
       return {
@@ -196,12 +216,15 @@ export class PushNotificationService {
           deviceId: dt.deviceId,
           platform: dt.platform,
           preferences: dt.preferences,
-          lastUsed: dt.lastUsed}))};
-      
+          lastUsed: dt.lastUsed
+        }))
+      };
+
     } catch (error: any) {
       typedLogger.error('Get preferences error', {
         userId,
-        error: (error as any).message});
+        error: (error as any).message
+      });
       throw error;
     }
   }
@@ -222,18 +245,20 @@ export class PushNotificationService {
       const deviceTokens = await DeviceToken.find({
         userId: new Types.ObjectId(userId),
         isActive: true,
-        'preferences.enabled': true});
+        'preferences.enabled': true
+      });
 
       if (deviceTokens.length === 0) {
         return {
           sent: 0,
-          message: 'No active devices'};
+          message: 'No active devices'
+        };
       }
 
       // Filter by notification type preference
       const filteredDevices = deviceTokens.filter(dt => {
         if (!notification.type) return true;
-        
+
         const prefKey = notification.type as keyof INotificationPreferences;
         return dt.preferences[prefKey] !== false;
       });
@@ -243,16 +268,19 @@ export class PushNotificationService {
       typedLogger.info('Push notification sent', {
         userId,
         devices: filteredDevices.length,
-        notification});
+        notification
+      });
 
       return {
         sent: filteredDevices.length,
-        devices: filteredDevices.map(dt => dt.deviceId)};
-      
+        devices: filteredDevices.map(dt => dt.deviceId)
+      };
+
     } catch (error: any) {
       typedLogger.error('Send notification error', {
         userId,
-        error: (error as any).message});
+        error: (error as any).message
+      });
       throw error;
     }
   }
@@ -274,19 +302,18 @@ export default async function pushNotificationRoutes(fastify: FastifyInstance) {
           properties: {
             deviceId: { type: 'string' },
             platform: { type: 'string' },
-            preferences: { type: 'object' }}}}
+            preferences: { type: 'object' }
+          }
+        }
+      }
     }
   }, async (request: FastifyRequest, reply: FastifyReply) => {
-    try {
-      const userId = request.user.sub;
-      const data = registerDeviceSchema.parse(request.body);
+    const userId = request.user.sub;
+    const data = registerDeviceSchema.parse(request.body);
 
-      const result = await PushNotificationService.registerDevice(userId, data);
+    const result = await PushNotificationService.registerDevice(userId, data);
 
-      return reply.code(200).send(result);
-    } catch (error: any) {
-      throw error;
-    }
+    return reply.code(200).send(result);
   });
 
   // POST /api/notifications/unregister-device
@@ -299,7 +326,10 @@ export default async function pushNotificationRoutes(fastify: FastifyInstance) {
         200: {
           type: 'object',
           properties: {
-            message: { type: 'string' }}}}
+            message: { type: 'string' }
+          }
+        }
+      }
     }
   }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
@@ -328,7 +358,10 @@ export default async function pushNotificationRoutes(fastify: FastifyInstance) {
           type: 'object',
           properties: {
             updated: { type: 'number' },
-            preferences: { type: 'object' }}}}
+            preferences: { type: 'object' }
+          }
+        }
+      }
     }
   }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
@@ -355,25 +388,26 @@ export default async function pushNotificationRoutes(fastify: FastifyInstance) {
       querystring: {
         type: 'object',
         properties: {
-          deviceId: { type: 'string' }}},
+          deviceId: { type: 'string' }
+        }
+      },
       response: {
         200: {
           type: 'object',
           properties: {
             devices: { type: 'array' },
-            defaultPreferences: { type: 'object' }}}}
+            defaultPreferences: { type: 'object' }
+          }
+        }
+      }
     }
   }, async (request: FastifyRequest, reply: FastifyReply) => {
-    try {
-      const userId = request.user.sub;
-      const { deviceId } = request.query as { deviceId?: string };
-      
-      const result = await PushNotificationService.getPreferences(userId, deviceId);
-      
-      return reply.code(200).send(result);
-    } catch (error: any) {
-      throw error;
-    }
+    const userId = request.user.sub;
+    const { deviceId } = request.query as { deviceId?: string };
+
+    const result = await PushNotificationService.getPreferences(userId, deviceId);
+
+    return reply.code(200).send(result);
   });
 }
 

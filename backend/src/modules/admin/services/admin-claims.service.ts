@@ -138,7 +138,7 @@ export class AdminClaimsService {
       throw new Error('Claim not found');
     }
 
-    (claim as any).status = 'rejected';
+    claim.set('status', 'rejected');
     if (!claim.metadata) {
       claim.metadata = {};
     }
@@ -171,6 +171,7 @@ export class AdminClaimsService {
       }
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const pipeline: any[] = [];
     if (Object.keys(matchStage).length > 0) {
       pipeline.push({ $match: matchStage });

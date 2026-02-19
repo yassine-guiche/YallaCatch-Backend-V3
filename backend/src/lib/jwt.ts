@@ -11,6 +11,7 @@ export interface JWTPayload {
   email?: string;
   role: string;
   deviceId?: string;
+  partnerId?: string;
   sessionId: string;
   iat?: number;
   exp?: number;
@@ -211,13 +212,13 @@ export const verifyToken = async (token: string): Promise<JWTVerificationResult>
 export const refreshAccessToken = async (refreshToken: string): Promise<TokenPair | null> => {
   try {
     const verificationResult = await verifyToken(refreshToken);
-    
+
     if (!verificationResult.valid || !verificationResult.decoded) {
       logSecurity('invalid_refresh_token', 'medium', { error: verificationResult.error });
       return null;
     }
 
-    const { sub, email, role, deviceId, sessionId } = verificationResult.decoded;
+    const { sub, email, role, deviceId, sessionId, partnerId } = verificationResult.decoded;
 
     // Generate new token pair
     const newTokenPair = signTokenPair({
@@ -226,6 +227,7 @@ export const refreshAccessToken = async (refreshToken: string): Promise<TokenPai
       role,
       deviceId,
       sessionId,
+      partnerId,
     });
 
     // Revoke old refresh token
@@ -248,10 +250,10 @@ export const revokeToken = async (jti: string): Promise<void> => {
   try {
     // Add to revocation list with a TTL matching the token's max lifetime
     await RedisCache.set(`revoked:${jti}`, true, 30 * 24 * 60 * 60); // 30 days
-    
+
     // Remove from active JTI list
     await RedisCache.del(`jti:${jti}`);
-    
+
     typedLogger.info('Token revoked', { jti });
   } catch (error) {
     typedLogger.error('Error revoking token', { error: (error as any).message, jti });
@@ -267,14 +269,14 @@ export const revokeAllUserTokens = async (userId: string): Promise<void> => {
     // Get all active JTIs for the user
     const pattern = `jti:*`;
     const keys = await RedisCache.smembers(`user_tokens:${userId}`);
-    
+
     // Revoke each token
     const revokePromises = keys.map(jti => revokeToken(jti));
     await Promise.all(revokePromises);
-    
+
     // Clear user token list
     await RedisCache.del(`user_tokens:${userId}`);
-    
+
     typedLogger.info('All user tokens revoked', { userId, count: keys.length });
   } catch (error) {
     typedLogger.error('Error revoking all user tokens', { error: (error as any).message, userId });
@@ -289,14 +291,14 @@ export const revokeSessionTokens = async (sessionId: string): Promise<void> => {
   try {
     // Get all active JTIs for the session
     const keys = await RedisCache.smembers(`session_tokens:${sessionId}`);
-    
+
     // Revoke each token
     const revokePromises = keys.map(jti => revokeToken(jti));
     await Promise.all(revokePromises);
-    
+
     // Clear session token list
     await RedisCache.del(`session_tokens:${sessionId}`);
-    
+
     typedLogger.info('All session tokens revoked', { sessionId, count: keys.length });
   } catch (error) {
     typedLogger.error('Error revoking session tokens', { error: (error as any).message, sessionId });

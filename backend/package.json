@@ -16,11 +16,12 @@
     "lint:fix": "eslint src --ext .ts --fix",
     "format": "prettier --write src/**/*.ts",
     "typecheck": "tsc --noEmit",
-    "seed": "tsx scripts/seed.ts",
-    "migrate": "tsx scripts/migrate.ts",
-    "generate-keys": "tsx generate-keys.ts"
+    "seed": "tsx src/scripts/seed.ts",
+    "migrate": "tsx src/scripts/migrate.ts",
+    "generate-keys": "tsx src/scripts/generate-keys.ts"
   },
   "dependencies": {
+    "@fastify/compress": "^7.0.3",
     "@fastify/cors": "^8.4.0",
     "@fastify/helmet": "^11.1.1",
     "@fastify/multipart": "^8.0.0",
@@ -33,6 +34,7 @@
     "@types/socket.io": "^3.0.1",
     "axios": "^1.6.2",
     "bcryptjs": "2.4.3",
+    "check-disk-space": "^3.4.0",
     "dayjs": "^1.11.10",
     "dotenv": "^16.3.1",
     "fastify": "^4.24.3",
@@ -47,6 +49,7 @@
     "pino": "^10.1.0",
     "pino-pretty": "^10.2.3",
     "pino-roll": "^4.0.0",
+    "qrcode": "^1.5.4",
     "rate-limiter-flexible": "^2.4.1",
     "sanitize-html": "^2.11.0",
     "socket.io": "^4.8.1",
@@ -56,20 +59,20 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@types/bcrypt": "^5.0.2",
+    "@types/bcryptjs": "^2.4.6",
     "@types/jest": "^29.5.8",
     "@types/jsonwebtoken": "^9.0.5",
     "@types/lodash": "^4.14.202",
-    "@types/node": "^20.9.0",
+    "@types/node": "^20.19.30",
     "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^6.4.14",
+    "@types/qrcode": "^1.5.6",
     "@types/sanitize-html": "^2.9.5",
     "@types/supertest": "^2.0.16",
     "@types/uuid": "^9.0.7",
     "@types/validator": "^13.11.6",
     "@typescript-eslint/eslint-plugin": "^6.12.0",
     "@typescript-eslint/parser": "^6.12.0",
-    "bcryptjs": "^2.4.3",
     "eslint": "^8.54.0",
     "jest": "^29.7.0",
     "jest-junit": "16.0.0",
@@ -104,8 +107,5 @@
     "fastify"
   ],
   "author": "YallaCatch Team",
-  "license": "MIT",
-  "imports": {
-    "bcrypt": "bcryptjs"
-  }
+  "license": "MIT"
 }

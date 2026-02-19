@@ -15,7 +15,10 @@ const PrizeManagementSchema = z.object({
   rarity: z.enum(['common', 'uncommon', 'rare', 'epic', 'legendary']).optional(),
   value: z.number().positive().optional(),
   quantity: z.number().int().min(0).optional(),
-  imageUrl: z.string().url().optional(),
+  imageUrl: z.string().optional().refine(
+    (val) => !val || val.startsWith('/uploads/') || /^https?:\/\/.+/.test(val),
+    { message: 'Image must be a valid URL or uploaded file path' }
+  ),
   city: z.string().optional(),
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
@@ -37,7 +40,7 @@ export default async function prizesRoutes(fastify: FastifyInstance) {
   fastify.addHook('onRequest', adminRateLimit)
 
   // GET /prizes - list prizes with pagination and filters
-  fastify.get('/prizes', async (request: FastifyRequest<{
+  fastify.get<{
     Querystring: {
       page?: string
       limit?: string
@@ -47,7 +50,7 @@ export default async function prizesRoutes(fastify: FastifyInstance) {
       city?: string
       search?: string
     }
-  }>, reply) => {
+  }>('/prizes', async (request, reply) => {
     const { page = '1', limit = '20', status, category, rarity, city, search } = request.query
 
     const result = await AdminPrizesService.getPrizes({
@@ -64,9 +67,9 @@ export default async function prizesRoutes(fastify: FastifyInstance) {
   })
 
   // GET /prizes/:prizeId - get single prize
-  fastify.get('/prizes/:prizeId', async (request: FastifyRequest<{
+  fastify.get<{
     Params: { prizeId: string }
-  }>, reply) => {
+  }>('/prizes/:prizeId', async (request, reply) => {
     const { prizeId } = request.params
 
     const prize = await AdminPrizesService.getPrize(prizeId)
@@ -79,25 +82,25 @@ export default async function prizesRoutes(fastify: FastifyInstance) {
   })
 
   // POST /prizes - create prize
-  fastify.post('/prizes', async (request: FastifyRequest<{
+  fastify.post<{
     Body: z.infer<typeof PrizeManagementSchema>
-  }>, reply) => {
+  }>('/prizes', async (request, reply) => {
     const validation = PrizeManagementSchema.safeParse(request.body)
 
     if (!validation.success) {
       return reply.status(400).send({ error: 'Validation failed', details: validation.error.errors })
     }
 
-    const adminId = (request as any).user?.sub || (request as any).userId;
+    const adminId = request.user?.sub;
     const prize = await AdminPrizesService.createPrize(validation.data, adminId)
 
     return reply.status(201).send(prize)
   })
   // PATCH /prizes/:prizeId - update prize
-  fastify.patch('/prizes/:prizeId', async (request: FastifyRequest<{
+  fastify.patch<{
     Params: { prizeId: string }
     Body: Partial<z.infer<typeof PrizeManagementSchema>>
-  }>, reply) => {
+  }>('/prizes/:prizeId', async (request, reply) => {
     const { prizeId } = request.params
     const validation = PrizeManagementSchema.partial().safeParse(request.body)
 
@@ -105,7 +108,7 @@ export default async function prizesRoutes(fastify: FastifyInstance) {
       return reply.status(400).send({ error: 'Validation failed', details: validation.error.errors })
     }
 
-    const adminId = (request as any).user?.sub || (request as any).userId;
+    const adminId = request.user?.sub;
     const prize = await AdminPrizesService.updatePrize(validation.data, prizeId, adminId);
 
     if (!prize) {
@@ -116,10 +119,10 @@ export default async function prizesRoutes(fastify: FastifyInstance) {
   });
 
   // PUT /prizes/:prizeId - update prize (alias for PATCH)
-  fastify.put('/prizes/:prizeId', async (request: FastifyRequest<{
+  fastify.put<{
     Params: { prizeId: string }
     Body: Partial<z.infer<typeof PrizeManagementSchema>>
-  }>, reply) => {
+  }>('/prizes/:prizeId', async (request, reply) => {
     const { prizeId } = request.params;
     const validation = PrizeManagementSchema.partial().safeParse(request.body);
 
@@ -127,7 +130,7 @@ export default async function prizesRoutes(fastify: FastifyInstance) {
       return reply.status(400).send({ error: 'Validation failed', details: validation.error.errors });
     }
 
-    const adminId = (request as any).user?.sub || (request as any).userId;
+    const adminId = request.user?.sub;
     const prize = await AdminPrizesService.updatePrize(validation.data, prizeId, adminId);
 
     if (!prize) {
@@ -138,12 +141,12 @@ export default async function prizesRoutes(fastify: FastifyInstance) {
   });
 
   // DELETE /prizes/:prizeId - delete prize
-  fastify.delete('/prizes/:prizeId', async (request: FastifyRequest<{
+  fastify.delete<{
     Params: { prizeId: string }
-  }>, reply) => {
+  }>('/prizes/:prizeId', async (request, reply) => {
     const { prizeId } = request.params;
 
-    const adminId = (request as any).user?.sub || (request as any).userId;
+    const adminId = request.user?.sub;
     const deleted = await AdminPrizesService.deletePrize(prizeId, adminId);
 
     if (!deleted) {
@@ -154,19 +157,19 @@ export default async function prizesRoutes(fastify: FastifyInstance) {
   });
 
   // GET /prizes/nearby - get prizes near a location
-  fastify.get('/prizes/nearby', async (request: FastifyRequest<{
+  fastify.get<{
     Querystring: { latitude: string; longitude: string; radius?: string }
-  }>, reply) => {
+  }>('/prizes/nearby', async (request, reply) => {
     const { latitude, longitude, radius = '5000' } = request.query;
-    
+
     const lat = parseFloat(latitude);
     const lng = parseFloat(longitude);
     const rad = parseFloat(radius);
-    
+
     if (isNaN(lat) || isNaN(lng)) {
       return reply.status(400).send({ error: 'Invalid latitude or longitude' });
     }
-    
+
     const prizes = await AdminPrizesService.getNearbyPrizes?.(lat, lng, rad) || [];
     return reply.send({ success: true, data: prizes, count: prizes.length });
   });

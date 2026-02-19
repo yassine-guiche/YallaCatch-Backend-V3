@@ -10,22 +10,22 @@ export class AdminSettingsService {
     return Settings.findOne();
   }
 
-  static async updateSettings(adminId: string, update: any) {
+  static async updateSettings(adminId: string, update: Record<string, unknown>) {
     typedLogger.info('Updating settings', { adminId });
     const updated = await Settings.findOneAndUpdate(
       {},
       { ...update, updatedBy: new Types.ObjectId(adminId) },
       { new: true, upsert: true }
     );
-    
+
     // Broadcast config change
     if (updated) {
       await configService.reload();
     }
-    
+
     // Audit log
     await audit.settingsUpdated(adminId, 'global', { metadata: { changes: Object.keys(update) } });
-    
+
     return updated;
   }
 
@@ -35,15 +35,15 @@ export class AdminSettingsService {
     return configService.getConfigSection(section);
   }
 
-  static async updateSettingsSection(adminId: string, section: string, data: any) {
+  static async updateSettingsSection(adminId: string, section: string, data: Record<string, unknown>) {
     typedLogger.info('Updating settings section', { adminId, section });
-    
+
     // Validate before updating
     const validation = await configService.validateConfigUpdate(section, data);
     if (!validation.valid) {
       throw new Error(`Validation failed: ${validation.errors.join(', ')}`);
     }
-    
+
     // Use ConfigService for hot-reload support
     return configService.updateConfigSection(section, data, adminId);
   }
@@ -68,7 +68,7 @@ export class AdminSettingsService {
       },
       { new: true, upsert: true }
     );
-    
+
     // Audit log
     await audit.custom({
       userId: adminId,
@@ -80,7 +80,7 @@ export class AdminSettingsService {
       description: 'Started maintenance mode',
       metadata: { message },
     });
-    
+
     return result;
   }
 
@@ -95,7 +95,7 @@ export class AdminSettingsService {
       },
       { new: true, upsert: true }
     );
-    
+
     // Audit log
     await audit.custom({
       userId: adminId,
@@ -106,7 +106,7 @@ export class AdminSettingsService {
       severity: 'high',
       description: 'Stopped maintenance mode',
     });
-    
+
     return result;
   }
 }

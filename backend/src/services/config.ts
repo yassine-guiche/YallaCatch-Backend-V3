@@ -86,13 +86,13 @@ export class ConfigService extends EventEmitter {
           try {
             const event: ConfigChangeEvent = JSON.parse(message);
             this.configVersion = event.version;
-            
+
             // Invalidate cache for this section
             await CacheService.invalidate(`config:${event.section}`);
-            
+
             // Emit event to local listeners
             this.emit('configChanged', event);
-            
+
             typedLogger.info('Config change received', {
               section: event.section,
               version: event.version,
@@ -115,7 +115,7 @@ export class ConfigService extends EventEmitter {
   async getConfig(): Promise<Partial<ISettings> | null> {
     try {
       const cacheKey = 'config:full';
-      
+
       // Try cache first
       const cached = await CacheService.get<Partial<ISettings>>(cacheKey);
       if (cached) {
@@ -147,7 +147,7 @@ export class ConfigService extends EventEmitter {
   async getConfigSection<T = any>(section: string): Promise<T | null> {
     try {
       const cacheKey = `config:${section}`;
-      
+
       // Try cache first
       const cached = await CacheService.get<T>(cacheKey);
       if (cached) {
@@ -185,7 +185,7 @@ export class ConfigService extends EventEmitter {
   async getConfigValue<T = any>(path: string): Promise<T | undefined> {
     try {
       const [section, ...keys] = path.split('.');
-      
+
       const sectionData = await this.getConfigSection(section);
       if (!sectionData) {
         return undefined;
@@ -286,7 +286,7 @@ export class ConfigService extends EventEmitter {
   ): Promise<Partial<ISettings> | null> {
     try {
       const [section, ...keys] = path.split('.');
-      
+
       // Get current section
       const sectionData = await this.getConfigSection(section);
       if (!sectionData && keys.length > 0) {
@@ -362,6 +362,19 @@ export class ConfigService extends EventEmitter {
       if (updates.prizeDetectionRadiusM && updates.prizeDetectionRadiusM < 1) {
         errors.push('prizeDetectionRadiusM must be at least 1m');
       }
+      if (updates.catchRadiusM && updates.catchRadiusM < 1) {
+        errors.push('catchRadiusM must be at least 1m');
+      }
+      if (updates.visibleRadiusM && updates.visibleRadiusM < 1) {
+        errors.push('visibleRadiusM must be at least 1m');
+      }
+      // Validate radius hierarchy if multiple are present
+      if (updates.catchRadiusM && updates.visibleRadiusM && updates.catchRadiusM > updates.visibleRadiusM) {
+        errors.push('catchRadiusM cannot be larger than visibleRadiusM');
+      }
+      if (updates.visibleRadiusM && updates.prizeDetectionRadiusM && updates.visibleRadiusM > updates.prizeDetectionRadiusM) {
+        errors.push('visibleRadiusM cannot be larger than prizeDetectionRadiusM');
+      }
     }
 
     // Validate anti-cheat settings
@@ -390,13 +403,13 @@ export class ConfigService extends EventEmitter {
   async reload(): Promise<void> {
     try {
       typedLogger.info('Force reloading config');
-      
+
       // Clear all caches
       await CacheService.invalidate('config:');
-      
+
       // Load fresh config
       await this.getConfig();
-      
+
       typedLogger.info('Config reloaded successfully');
     } catch (error) {
       typedLogger.error('Failed to reload config', { error });

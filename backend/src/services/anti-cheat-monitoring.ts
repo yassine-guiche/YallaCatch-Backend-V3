@@ -1,9 +1,10 @@
-import { Types } from 'mongoose';
+import { Types, FilterQuery } from 'mongoose';
 import { Claim } from '@/models/Claim';
 import { User } from '@/models/User';
 import { typedLogger } from '@/lib/typed-logger';
 import { CacheService } from './cache';
-import { redisPubSub, redisPublisher } from '@/config/redis';
+import { redisPublisher } from '@/config/redis';
+import { IClaim } from '@/types';
 
 /**
  * Anti-Cheat Monitoring Service
@@ -22,6 +23,7 @@ export interface FlaggedClaim {
   adminNotes?: string;
   overriddenBy?: Types.ObjectId;
   overriddenAt?: Date;
+  createdAt?: Date;
   antiCheatDetails: {
     speedCheck?: { flag: boolean; riskScore: number };
     mockLocationDetection?: { flag: boolean; riskScore: number };
@@ -84,8 +86,8 @@ export class AntiCheatMonitoringService {
       const limit = filters.limit || 50;
       const offset = filters.offset || 0;
 
-      const query: any = {};
-      
+      const query: FilterQuery<IClaim> & Record<string, unknown> = {};
+
       if (filters.userId) {
         query.userId = new Types.ObjectId(filters.userId);
       }
@@ -108,9 +110,9 @@ export class AntiCheatMonitoringService {
 
       const total = await Claim.countDocuments(query);
 
-      return { claims: (claims as any) as FlaggedClaim[], total };
+      return { claims: claims as unknown as FlaggedClaim[], total };
     } catch (error) {
-      typedLogger.error('Failed to get flagged claims', { error });
+      typedLogger.error('Failed to get flagged claims', { error: error instanceof Error ? error.message : 'Unknown error' });
       throw error;
     }
   }
@@ -134,18 +136,18 @@ export class AntiCheatMonitoringService {
       }
 
       // Get user's claims
-      const userClaims = await Claim.find({ userId: new Types.ObjectId(userId) }).lean();
+      const userClaims = (await Claim.find({ userId: new Types.ObjectId(userId) }).lean()) as unknown as FlaggedClaim[];
       const totalClaims = userClaims.length;
 
       // Filter flagged claims
-      const flaggedClaims = userClaims.filter((c: any) => c.riskScore > 0);
+      const flaggedClaims = userClaims.filter((c) => c.riskScore > 0);
       const flaggedCount = flaggedClaims.length;
-      const rejectedCount = flaggedClaims.filter((c: any) => c.status === 'rejected').length;
+      const rejectedCount = flaggedClaims.filter((c) => c.status === 'rejected').length;
 
       // Calculate average risk score
       const avgRiskScore = flaggedClaims.length > 0
-        ? flaggedClaims.reduce((sum: number, c: any) => sum + (c.riskScore || 0), 0) /
-          flaggedClaims.length
+        ? flaggedClaims.reduce((sum, c) => sum + (c.riskScore || 0), 0) /
+        flaggedClaims.length
         : 0;
 
       // Determine risk level
@@ -179,7 +181,7 @@ export class AntiCheatMonitoringService {
         totalClaimsCount: totalClaims,
         lastFlaggedAt:
           flaggedClaims.length > 0
-            ? new Date(Math.max(...flaggedClaims.map((c: any) => new Date(c.createdAt).getTime())))
+            ? new Date(Math.max(...flaggedClaims.map((c) => new Date(c.createdAt || c.flaggedAt).getTime())))
             : undefined,
         suspiciousPatterns,
         recommendation,
@@ -193,7 +195,7 @@ export class AntiCheatMonitoringService {
 
       return profile;
     } catch (error) {
-      typedLogger.error('Failed to get user risk profile', { error, userId });
+      typedLogger.error('Failed to get user risk profile', { error: error instanceof Error ? error.message : 'Unknown error', userId });
       throw error;
     }
   }
@@ -212,26 +214,26 @@ export class AntiCheatMonitoringService {
       }
 
       // Get all claims
-      const allClaims = await Claim.find({}).lean();
+      const allClaims = (await Claim.find({}).lean()) as unknown as FlaggedClaim[];
       const totalAnalyzed = allClaims.length;
 
       // Count by status
-      const flaggedCount = allClaims.filter((c: any) => c.riskScore > 0).length;
-      const rejectedCount = allClaims.filter((c: any) => c.status === 'rejected').length;
-      const approvedCount = allClaims.filter((c: any) => c.status === 'approved').length;
-      const overriddenCount = allClaims.filter((c: any) => c.status === 'overridden').length;
+      const flaggedCount = allClaims.filter((c) => c.riskScore > 0).length;
+      const rejectedCount = allClaims.filter((c) => c.status === 'rejected').length;
+      const approvedCount = allClaims.filter((c) => c.status === 'approved').length;
+      const overriddenCount = allClaims.filter((c) => c.status === 'overridden').length;
 
       // Calculate risk score distribution
       const riskDistribution = {
-        low: allClaims.filter((c: any) => (c.riskScore || 0) < 25).length,
-        medium: allClaims.filter((c: any) => (c.riskScore || 0) >= 25 && (c.riskScore || 0) < this.RISK_THRESHOLD).length,
-        high: allClaims.filter((c: any) => (c.riskScore || 0) >= this.RISK_THRESHOLD && (c.riskScore || 0) < this.CRITICAL_THRESHOLD).length,
-        critical: allClaims.filter((c: any) => (c.riskScore || 0) >= this.CRITICAL_THRESHOLD).length,
+        low: allClaims.filter((c) => (c.riskScore || 0) < 25).length,
+        medium: allClaims.filter((c) => (c.riskScore || 0) >= 25 && (c.riskScore || 0) < this.RISK_THRESHOLD).length,
+        high: allClaims.filter((c) => (c.riskScore || 0) >= this.RISK_THRESHOLD && (c.riskScore || 0) < this.CRITICAL_THRESHOLD).length,
+        critical: allClaims.filter((c) => (c.riskScore || 0) >= this.CRITICAL_THRESHOLD).length,
       };
 
       // Identify top risk factors
       const riskFactorCounts: { [key: string]: number } = {};
-      allClaims.forEach((c: any) => {
+      allClaims.forEach((c) => {
         if (c.riskFactors && Array.isArray(c.riskFactors)) {
           c.riskFactors.forEach((factor: string) => {
             riskFactorCounts[factor] = (riskFactorCounts[factor] || 0) + 1;
@@ -246,8 +248,8 @@ export class AntiCheatMonitoringService {
 
       // Get top flagged users
       const userRisks: { [userId: string]: UserRiskProfile } = {};
-      for (const claim of allClaims.filter((c: any) => c.riskScore > 0)) {
-        const userId = (claim as any).userId?.toString();
+      for (const claim of allClaims.filter((c) => c.riskScore > 0)) {
+        const userId = claim.userId?.toString();
         if (userId && !userRisks[userId]) {
           const profile = await this.getUserRiskProfile(userId);
           if (profile) {
@@ -280,7 +282,7 @@ export class AntiCheatMonitoringService {
 
       return metrics;
     } catch (error) {
-      typedLogger.error('Failed to get metrics', { error });
+      typedLogger.error('Failed to get metrics', { error: error instanceof Error ? error.message : 'Unknown error' });
       throw error;
     }
   }
@@ -325,15 +327,14 @@ export class AntiCheatMonitoringService {
       );
 
       // Invalidate user risk cache
-      const userId = (claim as any).userId?.toString();
-      if (userId) {
-        await CacheService.invalidate(`${this.CACHE_KEY_PREFIX}user-risk:${userId}`);
+      if (claim.userId) {
+        await CacheService.invalidate(`${this.CACHE_KEY_PREFIX}user-risk:${claim.userId.toString()}`);
         await CacheService.invalidate(`${this.CACHE_KEY_PREFIX}metrics`);
       }
 
-      return (claim as any) as FlaggedClaim;
+      return claim as unknown as FlaggedClaim;
     } catch (error) {
-      typedLogger.error('Failed to override claim', { error, claimId });
+      typedLogger.error('Failed to override claim', { error: error instanceof Error ? error.message : 'Unknown error', claimId });
       throw error;
     }
   }
@@ -351,12 +352,12 @@ export class AntiCheatMonitoringService {
     recommendations: string[];
   }> {
     try {
-      const allClaims = await Claim.find({}).lean();
+      const allClaims = (await Claim.find({}).lean()) as unknown as FlaggedClaim[];
       const patterns = [];
 
       // Pattern 1: Rapid consecutive claims
       const rapidClaimers = new Map<string, number>();
-      allClaims.forEach((c: any) => {
+      allClaims.forEach((c) => {
         const userId = c.userId?.toString();
         if (userId) {
           rapidClaimers.set(userId, (rapidClaimers.get(userId) || 0) + 1);
@@ -377,7 +378,7 @@ export class AntiCheatMonitoringService {
       }
 
       // Pattern 2: Geographic impossibilities
-      const geographicPatterns = allClaims.filter((c: any) => 
+      const geographicPatterns = allClaims.filter((c) =>
         c.riskFactors?.includes('teleportDetection')
       ).length;
 
@@ -391,7 +392,7 @@ export class AntiCheatMonitoringService {
       }
 
       // Pattern 3: Mock location usage
-      const mockLocationCount = allClaims.filter((c: any) =>
+      const mockLocationCount = allClaims.filter((c) =>
         c.riskFactors?.includes('mockLocationDetection')
       ).length;
 
@@ -413,7 +414,7 @@ export class AntiCheatMonitoringService {
 
       return { patterns, recommendations };
     } catch (error) {
-      typedLogger.error('Failed to analyze fraud patterns', { error });
+      typedLogger.error('Failed to analyze fraud patterns', { error: error instanceof Error ? error.message : 'Unknown error' });
       throw error;
     }
   }
@@ -421,7 +422,7 @@ export class AntiCheatMonitoringService {
   /**
    * Identify suspicious patterns from user claims
    */
-  private static identifySuspiciousPatterns(claims: any[]): string[] {
+  private static identifySuspiciousPatterns(claims: FlaggedClaim[]): string[] {
     const patterns: Set<string> = new Set();
 
     // Check for rapid consecutive claims
