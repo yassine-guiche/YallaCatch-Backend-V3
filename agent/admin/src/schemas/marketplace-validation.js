@@ -128,15 +128,25 @@ export const validateMarketplaceItem = (data) => {
 };
 
 /**
- * Helper: Check if string is valid URL
- * @param {string} str - URL to validate
+ * Helper: Check if string is valid URL or relative path
+ * @param {string} str - URL or path to validate
  * @returns {boolean}
  */
 function isValidUrl(str) {
+  if (!str || typeof str !== 'string') return false;
+
+  // Allow relative paths starting with /
+  if (str.startsWith('/')) return true;
+
+  // Allow common image file extensions if they look like paths
+  if (/\.(jpg|jpeg|png|gif|webp|svg)/i.test(str) && !str.includes(' ')) return true;
+
   try {
     new URL(str);
     return true;
   } catch {
+    // Check if it's a data URL
+    if (str.startsWith('data:image/')) return true;
     return false;
   }
 }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { getImageUrl } from '../utils/images';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -205,6 +206,7 @@ export default function PartnerMarketplace() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[60px]">Image</TableHead>
                 <TableHead>Nom</TableHead>
                 <TableHead>Catégorie</TableHead>
                 <TableHead>Points</TableHead>
@@ -217,6 +219,24 @@ export default function PartnerMarketplace() {
             <TableBody>
               {items.map((item) => (
                 <TableRow key={item._id || item.id}>
+                  <TableCell>
+                    <div className="w-10 h-10 rounded border border-gray-100 overflow-hidden bg-gray-50 flex items-center justify-center">
+                      {item.imageUrl ? (
+                        <img
+                          src={getImageUrl(item.imageUrl)}
+                          alt={item.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = '/placeholder-reward.png';
+                            e.target.className = 'w-5 h-5 opacity-20';
+                          }}
+                        />
+                      ) : (
+                        <ShoppingBag className="w-5 h-5 text-gray-300" />
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell className="font-medium">{item.name}</TableCell>
                   <TableCell><Badge variant="outline">{item.category}</Badge></TableCell>
                   <TableCell>{item.pointsCost}</TableCell>

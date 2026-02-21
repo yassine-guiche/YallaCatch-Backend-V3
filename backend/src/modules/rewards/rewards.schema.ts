@@ -29,7 +29,10 @@ export const createRewardSchema = z.object({
     category: z.enum(Object.values(RewardCategory) as [string, ...string[]]),
     pointsCost: z.number().min(1).max(100000),
     stockQuantity: z.number().min(1).max(10000),
-    imageUrl: z.string().url().optional(),
+    imageUrl: z.string().optional().refine(
+        (val) => !val || val.startsWith('/uploads/') || /^https?:\/\/.+/.test(val),
+        { message: 'Image must be a valid URL or uploaded file path' }
+    ),
     isPopular: z.boolean().default(false),
     partnerId: z.string().regex(/^[0-9a-fA-F]{24}$/).optional(),
     metadata: z.record(z.any()).optional(),

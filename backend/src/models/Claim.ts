@@ -87,7 +87,13 @@ const claimSchema = new Schema<IClaim>({
   },
 }, {
   timestamps: true,
-  toJSON: { virtuals: true },
+  toJSON: { 
+    virtuals: true,
+    transform: (doc, ret: any) => {
+      ret._id = ret._id.toString();
+      return ret;
+    }
+  },
   toObject: { virtuals: true }
 });
 

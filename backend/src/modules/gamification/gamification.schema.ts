@@ -49,7 +49,7 @@ export interface UpdateAchievementData {
 export const achievementSchema = z.object({
     name: z.string().min(3).max(100),
     description: z.string().min(10).max(500),
-    icon: z.string().url().optional().default(''),
+    icon: z.string().optional().default(''),
     category: z.enum(['explorer', 'collector', 'social', 'master', 'special']),
     trigger: z.enum(['PRIZE_CLAIMED', 'LEVEL_UP', 'REWARD_REDEEMED', 'FRIEND_ADDED', 'STREAK_MILESTONE', 'DISTANCE_MILESTONE', 'MANUAL']),
     condition: z.object({
@@ -71,7 +71,7 @@ export const achievementSchema = z.object({
 export const updateAchievementSchema = z.object({
     name: z.string().min(3).max(100).optional(),
     description: z.string().min(10).max(500).optional(),
-    icon: z.string().url().optional(),
+    icon: z.string().optional(),
     category: z.enum(['explorer', 'collector', 'social', 'master', 'special']).optional(),
     trigger: z.enum(['PRIZE_CLAIMED', 'LEVEL_UP', 'REWARD_REDEEMED', 'FRIEND_ADDED', 'STREAK_MILESTONE', 'DISTANCE_MILESTONE', 'MANUAL']).optional(),
     condition: z.object({

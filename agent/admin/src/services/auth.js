@@ -6,7 +6,6 @@
 import api from './api';
 
 // Local storage keys
-const TOKEN_KEY = 'admin_token';
 const USER_KEY = 'admin_user';
 
 /**
@@ -25,14 +24,13 @@ export async function loginWithEmail(email, password) {
 
     if (response.success && response.data) {
       const { user, token } = response.data;
-      
-      // Store token and user in localStorage
-      localStorage.setItem(TOKEN_KEY, token);
+
+      // Store user in localStorage
       localStorage.setItem(USER_KEY, JSON.stringify(user));
-      
-      // Set token for future API calls
+
+      // Set token for future API calls (this also handles persistent storage)
       api.setAuthToken(token);
-      
+
       return { user, token };
     } else {
       throw new Error(response.error || 'Login failed');
@@ -54,9 +52,8 @@ export async function logout() {
     console.error('Logout error:', error);
   } finally {
     // Clear local storage
-    localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
-    
+
     // Clear API token
     api.setAuthToken(null);
   }
@@ -83,7 +80,7 @@ export function getCurrentUser() {
  * @returns {string|null}
  */
 export function getAuthToken() {
-  return localStorage.getItem(TOKEN_KEY);
+  return api.getAccessToken();
 }
 
 /**
@@ -103,10 +100,9 @@ export function isAuthenticated() {
 export async function refreshToken() {
   try {
     const response = await api.post('/auth/refresh');
-    
+
     if (response.success && response.data?.token) {
       const newToken = response.data.token;
-      localStorage.setItem(TOKEN_KEY, newToken);
       api.setAuthToken(newToken);
       return newToken;
     } else {
@@ -129,13 +125,13 @@ export function subscribeAuth(callback) {
   // Check auth state immediately
   const user = getCurrentUser();
   callback(user);
-  
+
   // Set up a periodic check (every 30 seconds)
   const intervalId = setInterval(() => {
     const currentUser = getCurrentUser();
     callback(currentUser);
   }, 30000);
-  
+
   // Return unsubscribe function
   return () => {
     clearInterval(intervalId);
@@ -150,7 +146,7 @@ export function subscribeAuth(callback) {
 export async function fetchAdminProfile(userId) {
   try {
     const response = await api.get(`/users/${userId}`);
-    
+
     if (response.success && response.data) {
       return response.data;
     } else {
@@ -171,13 +167,13 @@ export async function fetchAdminProfile(userId) {
 export async function updateAdminProfile(userId, updates) {
   try {
     const response = await api.patch(`/users/${userId}`, updates);
-    
+
     if (response.success && response.data) {
       // Update stored user
       const currentUser = getCurrentUser();
       const updatedUser = { ...currentUser, ...response.data };
       localStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
-      
+
       return updatedUser;
     } else {
       throw new Error('Failed to update admin profile');
@@ -200,7 +196,7 @@ export async function changePassword(currentPassword, newPassword) {
       currentPassword,
       newPassword,
     });
-    
+
     if (!response.success) {
       throw new Error(response.error || 'Failed to change password');
     }
@@ -214,10 +210,7 @@ export async function changePassword(currentPassword, newPassword) {
  * Initialize auth on app startup
  */
 export function initAuth() {
-  const token = getAuthToken();
-  if (token) {
-    api.setAuthToken(token);
-  }
+  // apiService already auto-initializes its token from its own storage in the constructor
 }
 
 // Initialize on module load

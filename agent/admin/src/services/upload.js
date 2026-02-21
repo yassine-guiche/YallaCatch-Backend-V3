@@ -79,7 +79,7 @@ export async function uploadImage(file, type = 'reward-image', onProgress = null
                     resolve({ success: false, error: 'Network error' });
                 });
 
-                const token = localStorage.getItem('access_token');
+                const token = apiService.getAccessToken();
                 xhr.open('POST', `${import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1'}/upload/${type}`);
                 if (token) {
                     xhr.setRequestHeader('Authorization', `Bearer ${token}`);

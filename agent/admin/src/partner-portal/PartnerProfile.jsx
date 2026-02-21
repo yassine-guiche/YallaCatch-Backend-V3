@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getImageUrl } from '../utils/images';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import {
@@ -97,8 +98,7 @@ export default function PartnerProfile() {
                     setValue('twitter', data.socialMedia.twitter);
                 }
                 if (data.logo) {
-                    const logoUrl = data.logo.startsWith('http') ? data.logo : `${import.meta.env.VITE_API_URL?.replace('/api/v1', '')}${data.logo}`;
-                    setLogoPreview(logoUrl);
+                    setLogoPreview(getImageUrl(data.logo));
                     setValue('logo', data.logo);
                 }
             }
@@ -277,8 +277,7 @@ export default function PartnerProfile() {
                                                 initialPreview={logoPreview}
                                                 onUploadComplete={(url) => {
                                                     setValue('logo', url); // url from service is relative path
-                                                    const fullUrl = url.startsWith('http') ? url : `${import.meta.env.VITE_API_URL?.replace('/api/v1', '')}${url}`;
-                                                    setLogoPreview(fullUrl);
+                                                    setLogoPreview(getImageUrl(url));
                                                 }}
                                                 uploadType="partner-logo"
                                                 className="aspect-square w-full"

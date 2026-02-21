@@ -189,7 +189,7 @@ export class PartnerService {
                 { $group: { _id: '$reward.category', count: { $sum: 1 } } }
             ]),
             Redemption.find({ rewardId: { $in: rewardIds } })
-                .populate('rewardId', 'name category')
+                .populate('rewardId', 'name category imageUrl')
                 .populate('userId', 'displayName email')
                 .sort({ createdAt: -1 })
                 .limit(limitRecent)
@@ -223,7 +223,7 @@ export class PartnerService {
                 id: r._id,
                 status: r.status,
                 createdAt: r.createdAt,
-                reward: r.rewardId ? { id: r.rewardId._id, name: r.rewardId.name, category: r.rewardId.category } : null,
+                reward: r.rewardId ? { id: r.rewardId._id, name: r.rewardId.name, category: r.rewardId.category, imageUrl: r.rewardId.imageUrl } : null,
                 user: r.userId ? { id: r.userId._id, displayName: r.userId.displayName, email: r.userId.email } : null,
             })),
         };

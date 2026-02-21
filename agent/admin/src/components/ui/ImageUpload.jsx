@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Upload, X, Image as ImageIcon, Loader2, AlertCircle } from 'lucide-react';
 import { validateFile } from '../../services/upload';
+import { getImageUrl } from '../../utils/images';
 
 /**
  * ImageUpload Component - Reusable image upload with drag-and-drop and preview
@@ -76,7 +77,7 @@ export function ImageUpload({
                 if (result?.success && result?.url) {
                     // Use the uploaded URL
                     onChange?.(result.url);
-                    setPreview(result.url.startsWith('/') ? `${import.meta.env.VITE_API_URL?.replace('/api/v1', '') || 'http://localhost:3000'}${result.url}` : result.url);
+                    setPreview(getImageUrl(result.url));
                 } else {
                     setError(result?.error || 'Upload failed');
                     setPreview(value); // Revert to original
@@ -133,11 +134,7 @@ export function ImageUpload({
     // Determine preview URL (handle both relative and absolute URLs)
     const getPreviewUrl = () => {
         if (!hasImage) return null;
-        const url = preview || value;
-        if (url?.startsWith('/uploads/')) {
-            return `${import.meta.env.VITE_API_URL?.replace('/api/v1', '') || 'http://localhost:3000'}${url}`;
-        }
-        return url;
+        return getImageUrl(preview || value);
     };
 
     return (

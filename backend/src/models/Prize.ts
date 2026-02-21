@@ -149,7 +149,7 @@ const prizeSchema = new Schema<IPrize>({
       type: String,
       validate: {
         validator: function(url: string) {
-          return !url || /^https?:\/\/.+/.test(url);
+          return !url || url.startsWith('/uploads/') || /^https?:\/\/.+/.test(url);
         },
         message: 'Invalid marker URL format'
       }
@@ -196,7 +196,7 @@ const prizeSchema = new Schema<IPrize>({
     type: String,
     validate: {
       validator: function(url: string) {
-        return !url || /^https?:\/\/.+/.test(url);
+        return !url || url.startsWith('/uploads/') || /^https?:\/\/.+/.test(url);
       },
       message: 'Invalid image URL format'
     }
@@ -251,7 +251,16 @@ const prizeSchema = new Schema<IPrize>({
   },
 }, {
   timestamps: true,
-  toJSON: { virtuals: true },
+  toJSON: { 
+    virtuals: true,
+    transform: (doc, ret: any) => {
+      if (ret.location && ret.location.coordinates) {
+        ret.location.lat = ret.location.coordinates[1];
+        ret.location.lng = ret.location.coordinates[0];
+      }
+      return ret;
+    }
+  },
   toObject: { virtuals: true }
 });
 

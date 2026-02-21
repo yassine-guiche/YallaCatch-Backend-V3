@@ -12,6 +12,7 @@ import { getCaptures, validateCapture, rejectCapture, getCaptureStats } from '..
 import { formatDate, formatRelativeDate } from '../utils/dates';
 import MapComponent from '../components/MapComponent';
 import { usePrizesUpdates } from '../hooks/useRealtimeUpdates';
+import { getImageUrl } from '../utils/images';
 
 export default function PrizeClaimsManagement() {
   const [captures, setCaptures] = useState([]);
@@ -32,24 +33,24 @@ export default function PrizeClaimsManagement() {
   const loadCaptures = useCallback(async () => {
     try {
       setLoading(true);
-      
+
       const filters = {
         page: currentPage,
         limit: capturesPerPage
       };
-      
+
       if (searchTerm) filters.search = searchTerm;
       if (filterStatus !== 'all') filters.status = filterStatus;
-      
+
       const result = await getCaptures(filters);
       setCaptures(result.items || []);
       setTotalCaptures(result.total || 0);
       setTotalPages(Math.ceil((result.total || 0) / capturesPerPage));
-      
+
       // Charger les stats
       const statsData = await getCaptureStats('7d');
       setStats(statsData);
-      
+
     } catch (err) {
       console.error('Erreur chargement captures:', err);
     } finally {
@@ -69,7 +70,7 @@ export default function PrizeClaimsManagement() {
         setCurrentPage(1);
       }
     }, 500);
-    
+
     return () => clearTimeout(timer);
   }, [searchTerm, loadCaptures]);
 
@@ -96,7 +97,7 @@ export default function PrizeClaimsManagement() {
 
   const handleValidateConfirm = async () => {
     if (!pendingValidateId) return;
-    
+
     try {
       await validateCapture(pendingValidateId, 'Validé par admin');
       toast.success('Capture validée');
@@ -112,7 +113,7 @@ export default function PrizeClaimsManagement() {
   const handleReject = async (captureId) => {
     const reason = prompt('Raison du rejet:');
     if (!reason) return;
-    
+
     try {
       await rejectCapture(captureId, reason);
       toast.success('Capture rejetée');
@@ -133,9 +134,9 @@ export default function PrizeClaimsManagement() {
       validated: { label: 'Validée', className: 'bg-green-100 text-green-800' },
       rejected: { label: 'Rejetée', className: 'bg-red-100 text-red-800' }
     };
-    
+
     const variant = variants[status] || variants.pending;
-    
+
     return (
       <Badge className={variant.className}>
         {variant.label}
@@ -411,7 +412,7 @@ export default function PrizeClaimsManagement() {
                 <span className="text-sm">Rejetées</span>
               </div>
             </div>
-            
+
             <MapComponent
               prizes={capturesForMap}
               height="600px"
@@ -463,7 +464,7 @@ export default function PrizeClaimsManagement() {
                 <div>
                   <label className="text-sm font-medium text-gray-500">Localisation</label>
                   <p className="text-base">
-                    {selectedCapture.location?.coordinates 
+                    {selectedCapture.location?.coordinates
                       ? `${selectedCapture.location.coordinates[1].toFixed(4)}, ${selectedCapture.location.coordinates[0].toFixed(4)}`
                       : 'Non disponible'}
                   </p>
@@ -474,9 +475,9 @@ export default function PrizeClaimsManagement() {
               {selectedCapture.photo && (
                 <div>
                   <label className="text-sm font-medium text-gray-500 block mb-2">Photo de capture</label>
-                  <img 
-                    src={selectedCapture.photo} 
-                    alt="Capture" 
+                  <img
+                    src={getImageUrl(selectedCapture.photo)}
+                    alt="Capture"
                     className="w-full rounded-lg border"
                   />
                 </div>

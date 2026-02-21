@@ -101,7 +101,17 @@ const rewardSchema = new Schema<IReward>({
   },
 }, {
   timestamps: true,
-  toJSON: { virtuals: true },
+  toJSON: { 
+    virtuals: true,
+    transform: function (doc, ret: any) {
+      if (ret.partnerId && typeof ret.partnerId === 'object' && 'name' in ret.partnerId) {
+        ret.partnerName = ret.partnerId.name;
+        ret.partnerLogo = ret.partnerId.logo;
+        ret.partnerId = ret.partnerId._id.toString();
+      }
+      return ret;
+    }
+  },
   toObject: { virtuals: true }
 });
 
@@ -125,6 +135,10 @@ rewardSchema.virtual('popularityScore').get(function () {
   // Simple popularity calculation based on stock usage
   if (this.stockQuantity === 0) return 0;
   return ((this as any).stockUsed / this.stockQuantity) * 100;
+});
+
+rewardSchema.virtual('images').get(function () {
+  return this.imageUrl ? [this.imageUrl] : [];
 });
 
 // Pre-save middleware
@@ -196,7 +210,7 @@ rewardSchema.statics.findAvailable = function (options: any = {}) {
   }
 
   return this.find(query)
-    .populate('partnerId', 'name logoUrl')
+    .populate('partnerId', 'name logo')
     .sort(options.sort || { pointsCost: 1 })
     .limit(options.limit || 50);
 };
@@ -207,7 +221,7 @@ rewardSchema.statics.findPopular = function (limit: number = 10) {
     stockAvailable: { $gt: 0 },
     isPopular: true,
   })
-    .populate('partnerId', 'name logoUrl')
+    .populate('partnerId', 'name logo')
     .sort({ pointsCost: 1 })
     .limit(limit);
 };
@@ -218,7 +232,7 @@ rewardSchema.statics.findByCategory = function (category: RewardCategory, option
     isActive: true,
     stockAvailable: { $gt: 0 },
   })
-    .populate('partnerId', 'name logoUrl')
+    .populate('partnerId', 'name logo')
     .sort(options.sort || { pointsCost: 1 })
     .limit(options.limit || 50);
 };
@@ -229,7 +243,7 @@ rewardSchema.statics.searchRewards = function (query: string, options: any = {})
     isActive: true,
     stockAvailable: { $gt: 0 },
   })
-    .populate('partnerId', 'name logoUrl')
+    .populate('partnerId', 'name logo')
     .sort({ score: { $meta: 'textScore' } })
     .limit(options.limit || 20);
 };

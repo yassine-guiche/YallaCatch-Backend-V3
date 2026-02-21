@@ -89,9 +89,9 @@ export async function addReward(reward) {
       metadata: reward.metadata || {},
     };
 
-    // Only include imageUrl if it's a valid URL
+    // Include imageUrl if it's a valid URL or a local upload path
     const imageUrl = reward.imageUrl || reward.image;
-    if (imageUrl && imageUrl.startsWith('http')) {
+    if (imageUrl && (imageUrl.startsWith('http') || imageUrl.startsWith('/uploads/'))) {
       backendData.imageUrl = imageUrl;
     }
 

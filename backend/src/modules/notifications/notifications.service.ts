@@ -213,6 +213,7 @@ export class NotificationService {
 
             return {
                 notifications: userNotifications.map(un => ({
+                    _id: un._id,
                     id: un._id,
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     title: (un as any).notificationId?.title,
@@ -412,6 +413,7 @@ export class NotificationService {
                 total: totalCount,
                 unread: unreadCount,
                 recent: recentUserNotifications.map(un => ({
+                    _id: un._id,
                     id: un._id,
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     title: (un as any).notificationId?.title,

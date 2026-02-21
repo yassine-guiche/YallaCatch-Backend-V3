@@ -132,24 +132,43 @@ export default async function marketplaceRoutes(fastify: FastifyInstance) {
     }>('/items/:id', async (request, reply) => {
         try {
             const adminId = request.user?.sub;
-            const item = await Reward.findByIdAndUpdate(
-                request.params.id,
-                request.body,
-                { new: true }
-            );
+            const item = await Reward.findById(request.params.id);
+
             if (!item) return reply.status(404).send({ error: 'Item not found' });
+
+            // Update fields manually to trigger pre-save hooks (important for stock consistency)
+            const updates = request.body;
+            if (updates.name) item.name = updates.name;
+            if (updates.description) item.description = updates.description;
+            if (updates.category) item.category = updates.category as any;
+            if (updates.pointsCost) item.pointsCost = updates.pointsCost;
+            if (updates.stockQuantity !== undefined) item.stockQuantity = updates.stockQuantity;
+            if (updates.stockAvailable !== undefined) item.stockAvailable = updates.stockAvailable;
+            if (updates.imageUrl) item.imageUrl = updates.imageUrl;
+            if (updates.isActive !== undefined) item.isActive = updates.isActive;
+            if (updates.isPopular !== undefined) item.isPopular = updates.isPopular;
+            if (updates.partnerId) item.partnerId = updates.partnerId as any; // Cast for ObjectId
+            if (updates.metadata) item.metadata = { ...item.metadata, ...updates.metadata };
+
+            item.updatedBy = adminId as any;
+
+            await item.save();
+            console.log(`[Marketplace] Item ${item._id} saved. New stock: ${item.stockAvailable}`);
 
             // Log action
             await logAdminAction(adminId, 'UPDATE', 'marketplace_item', request.params.id, { changes: request.body });
 
             // Invalidate cache
-            await CacheService.invalidate('admin:marketplace:*');
+            const deleted = await CacheService.invalidate('admin:marketplace:*');
+            console.log(`[Marketplace] Cache invalidated for admin:marketplace:*. Keys deleted: ${deleted}`);
 
             // Broadcast event
             broadcastAdminEvent({ type: 'marketplace_item_updated', item });
+            console.log(`[Marketplace] Event broadcasted for item ${item._id}`);
 
             return reply.send(item);
         } catch (error) {
+            console.error('Failed to update marketplace item:', error);
             return reply.status(500).send({ error: 'Failed to update item' });
         }
     });

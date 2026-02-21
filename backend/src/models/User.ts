@@ -259,9 +259,25 @@ const userSchema = new Schema<IUser, IUserModel, IUserMethods, {}, IUserVirtuals
   timestamps: true,
   toJSON: {
     virtuals: true,
-    transform: function (doc, ret) {
+    transform: function (doc, ret: any) {
       delete ret.passwordHash;
       delete ret.__v;
+      
+      // Map numeric level for Unity while preserving name for Admin
+      ret.levelName = ret.level;
+      const levels: Record<string, number> = {
+        'bronze': 1, 'silver': 2, 'gold': 3, 'platinum': 4, 'diamond': 5
+      };
+      const levelKey = String(ret.level).toLowerCase();
+      ret.level = (levels[levelKey] || 1).toString();
+
+      // Flatten partnerId if populated
+      if (ret.partnerId && typeof ret.partnerId === 'object' && 'name' in ret.partnerId) {
+        ret.partnerName = ret.partnerId.name;
+        ret.partnerLogo = ret.partnerId.logo;
+        ret.partnerId = ret.partnerId._id.toString();
+      }
+
       return ret;
     }
   },
@@ -284,6 +300,17 @@ userSchema.index({ isBanned: 1, deletedAt: 1 });
 userSchema.virtual('isActive').get(function () {
   const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   return this.lastActive > oneWeekAgo;
+});
+
+userSchema.virtual('numericLevel').get(function () {
+  const levels: Record<string, number> = {
+    [UserLevel.BRONZE]: 1,
+    [UserLevel.SILVER]: 2,
+    [UserLevel.GOLD]: 3,
+    [UserLevel.PLATINUM]: 4,
+    [UserLevel.DIAMOND]: 5,
+  };
+  return levels[this.level] || 1;
 });
 
 userSchema.virtual('levelProgress').get(function () {

@@ -482,6 +482,15 @@ export class AuthService {
         try {
             // Find user by email
             const user = await User.findOne({ email: data.email }).select('+passwordHash');
+
+            // DEBUG LOGGING
+            console.log(`[LOGIN_DEBUG] Attempt for: ${data.email}`);
+            console.log(`[LOGIN_DEBUG] User found: ${!!user}`);
+            if (user) {
+                console.log(`[LOGIN_DEBUG] Stored Hash: ${user.passwordHash}`);
+                console.log(`[LOGIN_DEBUG] Input Password: ${data.password}`);
+            }
+
             if (!user) {
                 // Don't reveal if email exists or not
                 await new Promise(resolve => setTimeout(resolve, 1000));

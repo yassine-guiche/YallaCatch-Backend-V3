@@ -52,7 +52,7 @@ export class AdminRewardsService {
 
       const [rewards, total] = await Promise.all([
         Reward.find(filterQuery)
-          .populate('partnerId', 'name logoUrl')
+          .populate('partnerId', 'name logo')
           .sort({ createdAt: -1 })
           .skip(skip)
           .limit(limit),
@@ -87,7 +87,7 @@ export class AdminRewardsService {
         throw new Error('REWARD_NOT_FOUND');
       }
 
-      const reward = await Reward.findById(rewardId).populate('partnerId', 'name logoUrl');
+      const reward = await Reward.findById(rewardId).populate('partnerId', 'name logo');
       if (!reward) {
         throw new Error('REWARD_NOT_FOUND');
       }
@@ -145,7 +145,7 @@ export class AdminRewardsService {
       }
 
       // Build update object with allowed fields only
-      const allowedFields = ['name', 'description', 'category', 'pointsCost', 'imageUrl', 'isActive', 'isPopular', 'listingType'];
+      const allowedFields = ['name', 'description', 'category', 'pointsCost', 'imageUrl', 'isActive', 'isPopular', 'listingType', 'partnerId', 'metadata', 'stockQuantity'];
       const updateData: Record<string, unknown> = {};
 
       Object.keys(data).forEach(key => {

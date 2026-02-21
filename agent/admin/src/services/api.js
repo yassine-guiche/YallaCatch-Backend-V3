@@ -306,7 +306,7 @@ class APIService {
    */
   async uploadFile(endpoint, formData) {
     const url = `${this.baseURL}${endpoint}`;
-    const token = this.getAuthToken();
+    const token = this.getAccessToken();
 
     const headers = {};
     if (token) {

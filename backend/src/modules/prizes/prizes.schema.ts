@@ -48,7 +48,10 @@ export const createPrizeSchema = z.object({
         radius: z.number().min(10).max(500).default(50),
         city: z.enum(Object.keys(TUNISIA_CITIES) as [string, ...string[]]),
         address: z.string().max(200).optional(),
-        markerUrl: z.string().url().optional(),
+        markerUrl: z.string().optional().refine(
+            (val) => !val || val.startsWith('/uploads/') || /^https?:\/\/.+/.test(val),
+            { message: 'Marker must be a valid URL or uploaded file path' }
+        ),
         confidenceThreshold: z.number().min(0.1).max(1.0).default(0.8)
     }),
     visibility: z.object({
@@ -56,7 +59,10 @@ export const createPrizeSchema = z.object({
         endAt: z.string().datetime().optional()
     }).optional(),
     expiresAt: z.string().datetime().optional(),
-    imageUrl: z.string().url().optional(),
+    imageUrl: z.string().optional().refine(
+        (val) => !val || val.startsWith('/uploads/') || /^https?:\/\/.+/.test(val),
+        { message: 'Image must be a valid URL or uploaded file path' }
+    ),
     value: z.number().min(0).optional(),
     tags: z.array(z.string().max(20)).max(10).default([])
 });

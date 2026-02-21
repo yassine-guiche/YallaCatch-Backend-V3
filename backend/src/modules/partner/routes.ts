@@ -7,8 +7,18 @@ import { PartnerService } from './partner.service';
 import { PartnerItemSchema, PartnerLocationSchema, PartnerProfileSchema } from './partner.schema';
 
 const ensurePartner = (request: FastifyRequest) => {
-  const user = request.user as { role?: UserRole; partnerId?: string } | undefined;
-  if (!user || user.role !== UserRole.PARTNER || !user.partnerId) {
+  const user = request.user as { role?: UserRole; partnerId?: string; sub: string } | undefined;
+  if (!user) throw new Error('UNAUTHORIZED');
+
+  // If user is Admin/SuperAdmin/Moderator, they can act as a partner if partnerId is provided in query
+  const isAdmin = [UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MODERATOR].includes(user.role as UserRole);
+  const queryPartnerId = (request.query as any)?.partnerId;
+
+  if (isAdmin && queryPartnerId) {
+    return queryPartnerId;
+  }
+
+  if (user.role !== UserRole.PARTNER || !user.partnerId) {
     throw new Error('PARTNER_ONLY');
   }
   return user.partnerId;
@@ -17,6 +27,7 @@ const ensurePartner = (request: FastifyRequest) => {
 export default async function partnerRoutes(fastify: FastifyInstance) {
   // Common error handler helper
   const handlePartnerError = (reply: FastifyReply, error: any, message: string) => {
+    if (error.message === 'UNAUTHORIZED') return reply.code(401).send({ success: false, error: 'UNAUTHORIZED' });
     if (error.message === 'PARTNER_ONLY') return reply.code(403).send({ success: false, error: 'FORBIDDEN' });
     if (error.message === 'PARTNER_NOT_FOUND') return reply.code(404).send({ success: false, error: 'PARTNER_NOT_FOUND' });
     if (error.message === 'LOCATION_NOT_FOUND') return reply.code(404).send({ success: false, error: 'LOCATION_NOT_FOUND' });
@@ -33,7 +44,7 @@ export default async function partnerRoutes(fastify: FastifyInstance) {
   // --- PROFILE MANAGEMENT ---
 
   // Get partner profile
-  fastify.get('/profile', { preHandler: [authenticate, requireRole([UserRole.PARTNER]) as any] }, async (request, reply) => {
+  fastify.get('/profile', { preHandler: [authenticate, requireRole([UserRole.PARTNER, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MODERATOR]) as any] }, async (request, reply) => {
     try {
       const partnerId = ensurePartner(request);
       const partner = await PartnerService.getProfile(partnerId);
@@ -44,7 +55,7 @@ export default async function partnerRoutes(fastify: FastifyInstance) {
   });
 
   // Update partner profile
-  fastify.put('/profile', { preHandler: [authenticate, requireRole([UserRole.PARTNER]) as any] }, async (request: FastifyRequest<{ Body: z.infer<typeof PartnerProfileSchema> }>, reply) => {
+  fastify.put('/profile', { preHandler: [authenticate, requireRole([UserRole.PARTNER, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MODERATOR]) as any] }, async (request: FastifyRequest<{ Body: z.infer<typeof PartnerProfileSchema> }>, reply) => {
     try {
       const partnerId = ensurePartner(request);
       const body = PartnerProfileSchema.parse(request.body);
@@ -58,7 +69,7 @@ export default async function partnerRoutes(fastify: FastifyInstance) {
   // --- LOCATION MANAGEMENT ---
 
   // Get partner locations
-  fastify.get('/locations', { preHandler: [authenticate, requireRole([UserRole.PARTNER]) as any] }, async (request, reply) => {
+  fastify.get('/locations', { preHandler: [authenticate, requireRole([UserRole.PARTNER, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MODERATOR]) as any] }, async (request, reply) => {
     try {
       const partnerId = ensurePartner(request);
       const locations = await PartnerService.getLocations(partnerId);
@@ -69,7 +80,7 @@ export default async function partnerRoutes(fastify: FastifyInstance) {
   });
 
   // Update or Create Location
-  fastify.post('/location', { preHandler: [authenticate, requireRole([UserRole.PARTNER]) as any] }, async (request: FastifyRequest<{ Body: z.infer<typeof PartnerLocationSchema> }>, reply) => {
+  fastify.post('/location', { preHandler: [authenticate, requireRole([UserRole.PARTNER, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MODERATOR]) as any] }, async (request: FastifyRequest<{ Body: z.infer<typeof PartnerLocationSchema> }>, reply) => {
     try {
       const partnerId = ensurePartner(request);
       const payload = PartnerLocationSchema.parse(request.body);
@@ -82,7 +93,7 @@ export default async function partnerRoutes(fastify: FastifyInstance) {
   });
 
   // Delete partner location
-  fastify.delete('/locations/:id', { preHandler: [authenticate, requireRole([UserRole.PARTNER]) as any] }, async (request: FastifyRequest<{ Params: { id: string } }>, reply) => {
+  fastify.delete('/locations/:id', { preHandler: [authenticate, requireRole([UserRole.PARTNER, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MODERATOR]) as any] }, async (request: FastifyRequest<{ Params: { id: string } }>, reply) => {
     try {
       const partnerId = ensurePartner(request);
       const locations = await PartnerService.removeLocation(partnerId, request.params.id);
@@ -95,7 +106,7 @@ export default async function partnerRoutes(fastify: FastifyInstance) {
   // --- MARKETPLACE ITEMS ---
 
   // List Items
-  fastify.get('/items', { preHandler: [authenticate, requireRole([UserRole.PARTNER]) as any] }, async (request, reply) => {
+  fastify.get('/items', { preHandler: [authenticate, requireRole([UserRole.PARTNER, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MODERATOR]) as any] }, async (request, reply) => {
     try {
       const partnerId = ensurePartner(request);
       const items = await PartnerService.getItems(partnerId);
@@ -106,7 +117,7 @@ export default async function partnerRoutes(fastify: FastifyInstance) {
   });
 
   // Create Item
-  fastify.post('/items', { preHandler: [authenticate, requireRole([UserRole.PARTNER]) as any] }, async (request: FastifyRequest<{ Body: z.infer<typeof PartnerItemSchema> }>, reply) => {
+  fastify.post('/items', { preHandler: [authenticate, requireRole([UserRole.PARTNER, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MODERATOR]) as any] }, async (request: FastifyRequest<{ Body: z.infer<typeof PartnerItemSchema> }>, reply) => {
     try {
       const partnerId = ensurePartner(request);
       const body = PartnerItemSchema.parse(request.body);
@@ -119,7 +130,7 @@ export default async function partnerRoutes(fastify: FastifyInstance) {
   });
 
   // Update Item
-  fastify.put('/items/:id', { preHandler: [authenticate, requireRole([UserRole.PARTNER]) as any] }, async (request: FastifyRequest<{ Params: { id: string }; Body: Partial<z.infer<typeof PartnerItemSchema>> }>, reply) => {
+  fastify.put('/items/:id', { preHandler: [authenticate, requireRole([UserRole.PARTNER, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MODERATOR]) as any] }, async (request: FastifyRequest<{ Params: { id: string }; Body: Partial<z.infer<typeof PartnerItemSchema>> }>, reply) => {
     try {
       const partnerId = ensurePartner(request);
       const body = PartnerItemSchema.partial().parse(request.body);
@@ -132,7 +143,7 @@ export default async function partnerRoutes(fastify: FastifyInstance) {
   });
 
   // Delete Item
-  fastify.delete('/items/:id', { preHandler: [authenticate, requireRole([UserRole.PARTNER]) as any] }, async (request: FastifyRequest<{ Params: { id: string } }>, reply) => {
+  fastify.delete('/items/:id', { preHandler: [authenticate, requireRole([UserRole.PARTNER, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MODERATOR]) as any] }, async (request: FastifyRequest<{ Params: { id: string } }>, reply) => {
     try {
       const partnerId = ensurePartner(request);
       await PartnerService.deleteItem(partnerId, request.params.id);
@@ -145,10 +156,11 @@ export default async function partnerRoutes(fastify: FastifyInstance) {
   // --- STATISTICS & REDEMPTIONS ---
 
   // Partner Stats
-  fastify.get('/stats', { preHandler: [authenticate, requireRole([UserRole.PARTNER]) as any] }, async (request, reply) => {
+  fastify.get('/stats', { preHandler: [authenticate, requireRole([UserRole.PARTNER, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MODERATOR]) as any] }, async (request: FastifyRequest<{ Querystring: { partnerId?: string; limitRecent?: number } }>, reply) => {
     try {
       const partnerId = ensurePartner(request);
-      const data = await PartnerService.getStats(partnerId);
+      const limitRecent = request.query.limitRecent ? Number(request.query.limitRecent) : 5;
+      const data = await PartnerService.getStats(partnerId, limitRecent);
       return reply.send({ success: true, data });
     } catch (error: any) {
       return handlePartnerError(reply, error, 'Get stats error');
@@ -156,7 +168,7 @@ export default async function partnerRoutes(fastify: FastifyInstance) {
   });
 
   // Pending Redemptions
-  fastify.get('/redemptions/pending', { preHandler: [authenticate, requireRole([UserRole.PARTNER]) as any] }, async (request: FastifyRequest<{ Querystring: { limit?: number } }>, reply) => {
+  fastify.get('/redemptions/pending', { preHandler: [authenticate, requireRole([UserRole.PARTNER, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MODERATOR]) as any] }, async (request: FastifyRequest<{ Querystring: { partnerId?: string; limit?: number } }>, reply) => {
     try {
       const partnerId = ensurePartner(request);
       const limit = Math.min(Math.max((request.query.limit || 50), 1), 200);
@@ -169,7 +181,7 @@ export default async function partnerRoutes(fastify: FastifyInstance) {
   });
 
   // Marketplace Analytics (Commission etc)
-  fastify.get('/analytics', { preHandler: [authenticate, requireRole([UserRole.PARTNER]) as any] }, async (request, reply) => {
+  fastify.get('/analytics', { preHandler: [authenticate, requireRole([UserRole.PARTNER, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MODERATOR]) as any] }, async (request: FastifyRequest<{ Querystring: { partnerId?: string } }>, reply) => {
     try {
       const partnerId = ensurePartner(request);
       const data = await PartnerService.getAnalytics(partnerId);

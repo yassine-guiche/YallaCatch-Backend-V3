@@ -11,6 +11,7 @@ import { formatDate } from '../utils/dates';
 import QRScanner from '../components/QRScanner';
 import { usePartnerUpdates } from '../hooks/useRealtimeUpdates';
 import { useAuth } from '../contexts/AuthContext';
+import { getImageUrl } from '../utils/images';
 
 const statusVariant = {
   PENDING: 'outline',
@@ -129,6 +130,23 @@ export default function PartnerRedemptions() {
           <div className="text-xs text-gray-500">{item.user?.email}</div>
         </TableCell>
         <TableCell>
+          <div className="w-10 h-10 rounded border bg-gray-50 overflow-hidden flex items-center justify-center">
+            {item.reward?.imageUrl ? (
+              <img
+                src={getImageUrl(item.reward.imageUrl)}
+                alt=""
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.style.display = 'none';
+                }}
+              />
+            ) : (
+              <ScanLine className="w-5 h-5 text-gray-300" />
+            )}
+          </div>
+        </TableCell>
+        <TableCell>
           <div className="font-medium">{item.reward?.name || 'Récompense'}</div>
           <div className="text-xs text-gray-500">{item.reward?.category || '—'}</div>
         </TableCell>
@@ -179,6 +197,7 @@ export default function PartnerRedemptions() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Joueur</TableHead>
+                  <TableHead>Image</TableHead>
                   <TableHead>Récompense</TableHead>
                   <TableHead>Partenaire</TableHead>
                   <TableHead>Statut</TableHead>

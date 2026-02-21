@@ -95,7 +95,7 @@ class AdminPartnersService {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(pageSize)
-        .select('name description email phone website contactPerson categories isActive status createdAt updatedAt locations metrics logo commissionRate features')
+        .select('name description email phone website contactPerson categories isActive status createdAt updatedAt locations metrics logo logoUrl commissionRate features')
         .lean(),
       Partner.countDocuments(query),
     ]);

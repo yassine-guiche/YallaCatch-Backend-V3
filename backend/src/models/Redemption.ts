@@ -56,7 +56,13 @@ const redemptionSchema = new Schema<IRedemption>({
   },
 }, {
   timestamps: true,
-  toJSON: { virtuals: true },
+  toJSON: { 
+    virtuals: true,
+    transform: (doc, ret: any) => {
+      ret._id = ret._id.toString();
+      return ret;
+    }
+  },
   toObject: { virtuals: true }
 });
 

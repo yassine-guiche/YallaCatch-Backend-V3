@@ -69,6 +69,9 @@ import MapComponent from '../components/MapComponent';
 import CircleSelectionMap from '../components/CircleSelectionMap';
 import { toast } from 'sonner';
 import { usePrizesUpdates } from '../hooks/useRealtimeUpdates';
+import { getImageUrl } from '../utils/images';
+import { ImageUpload } from '../components/ui/ImageUpload';
+import { uploadPrizeImage } from '../services/upload';
 
 // Constants
 const CATEGORY_OPTIONS = [
@@ -134,6 +137,7 @@ const DEFAULT_FORM = {
   longitude: 10.1815,
   radius: 50,
   quantity: 1,
+  imageUrl: '',
   rewardId: null, // For direct reward
   probability: 1, // For hybrid probabilities (0-1)
 };
@@ -172,7 +176,7 @@ export default function PrizeDistributionPage() {
   const [editingPrize, setEditingPrize] = useState(null);
   const [rewardsOptions, setRewardsOptions] = useState([]);
   const [rewardsLoading, setRewardsLoading] = useState(false);
-  
+
   // Map visibility state (lazy loading)
   const [showMap, setShowMap] = useState(false);
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -232,11 +236,11 @@ export default function PrizeDistributionPage() {
       const filters = { page: currentPage, limit: prizesPerPage };
       if (searchTerm) filters.search = searchTerm;
       if (filterStatus !== 'all') filters.status = filterStatus;
-      
+
       const result = await getPrizes(filters);
       setPrizes(result.items || []);
       setTotalPages(Math.max(1, Math.ceil((result.total || 0) / prizesPerPage)));
-      
+
       if (result.stats) {
         setStats({
           active: result.stats.active || 0,
@@ -369,7 +373,7 @@ export default function PrizeDistributionPage() {
       longitude: area.center.lng,
     }));
   };
-  
+
   // Alias for circle drawn handler
   const handleCircleDrawn = handleAreaSelect;
 
@@ -389,7 +393,7 @@ export default function PrizeDistributionPage() {
   // Create single prize
   const handleCreatePrize = async (e) => {
     e.preventDefault();
-    
+
     // User-friendly validation
     if (!formData.name?.trim() || formData.name.trim().length < 2) {
       toast.error('Le nom est requis (minimum 2 caractères)');
@@ -458,7 +462,7 @@ export default function PrizeDistributionPage() {
         });
         toast.success('🎉 Prix créé avec succès !');
       }
-      
+
       setShowSingleDialog(false);
       setFormData(DEFAULT_FORM);
       setSelectedLocation(null);
@@ -507,7 +511,7 @@ export default function PrizeDistributionPage() {
       east: 11.5998,
       west: 7.5244
     };
-    
+
     // Helper to clamp coordinates to Tunisia bounds
     const clampToTunisia = (lat, lng) => ({
       lat: Math.max(TUNISIA_BOUNDS.south, Math.min(TUNISIA_BOUNDS.north, lat)),
@@ -517,12 +521,12 @@ export default function PrizeDistributionPage() {
     const count = Math.max(1, Math.min(100, Number(batchForm.count || 1)));
     const center = distributionArea.center;
     const areaRadius = distributionArea.radius || 500;
-    
+
     // Generate random locations within the circle, clamped to Tunisia bounds
     const locations = [];
     const radiusInDegreesLat = areaRadius / 111320;
     const radiusInDegreesLng = areaRadius / (111320 * Math.cos(center.lat * Math.PI / 180));
-    
+
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * 2 * Math.PI;
       const distance = Math.sqrt(Math.random());
@@ -576,7 +580,7 @@ export default function PrizeDistributionPage() {
       toast.error('Veuillez sélectionner une zone sur la carte en dessinant un cercle');
       return;
     }
-    
+
     if (!autoForm.title?.trim()) {
       toast.error('Le titre est requis pour la distribution automatique');
       return;
@@ -594,13 +598,13 @@ export default function PrizeDistributionPage() {
 
     const radiusKm = Math.max(0.1, (distributionArea.radius || 500) / 1000);
     const density = Math.max(1, Number(autoForm.density) || 10);
-    
+
     // Build payload matching backend AutoDistributionSchema
     const payload = {
       region: {
-        center: { 
-          latitude: distributionArea.center.lat, 
-          longitude: distributionArea.center.lng 
+        center: {
+          latitude: distributionArea.center.lat,
+          longitude: distributionArea.center.lng
         },
         radiusKm: radiusKm
       },
@@ -612,8 +616,8 @@ export default function PrizeDistributionPage() {
         type: autoForm.type || 'treasure',
         rarity: autoForm.rarity,
         displayType: autoForm.displayType || 'standard',
-        content: { 
-          points: Math.max(1, Number(autoForm.points) || 100) 
+        content: {
+          points: Math.max(1, Number(autoForm.points) || 100)
         }
       }
     };
@@ -701,7 +705,7 @@ export default function PrizeDistributionPage() {
     setIsDeleting(true);
     let successCount = 0;
     let errorCount = 0;
-    
+
     try {
       const deletePromises = Array.from(selectedPrizes).map(async (prizeId) => {
         try {
@@ -712,16 +716,16 @@ export default function PrizeDistributionPage() {
           console.error(`Erreur suppression ${prizeId}:`, err);
         }
       });
-      
+
       await Promise.all(deletePromises);
-      
+
       if (successCount > 0) {
         toast.success(`${successCount} prix supprimés avec succès`);
       }
       if (errorCount > 0) {
         toast.error(`${errorCount} prix n'ont pas pu être supprimés`);
       }
-      
+
       setSelectedPrizes(new Set());
       loadPrizes();
       loadAllPrizesForMap();
@@ -768,7 +772,7 @@ export default function PrizeDistributionPage() {
 
 
   // Prepare prizes for map
-  const prizesForMap = useMemo(() => 
+  const prizesForMap = useMemo(() =>
     allPrizesForMap.map(prize => ({
       id: prize.id,
       name: prize.name,
@@ -1064,6 +1068,7 @@ export default function PrizeDistributionPage() {
                           )}
                         </button>
                       </th>
+                      <th className="text-left p-3 font-medium w-[60px]">Image</th>
                       <th className="text-left p-3 font-medium">Nom</th>
                       <th className="text-left p-3 font-medium">Type</th>
                       <th className="text-left p-3 font-medium">Rareté</th>
@@ -1075,8 +1080,8 @@ export default function PrizeDistributionPage() {
                   </thead>
                   <tbody>
                     {prizes.map(prize => (
-                      <tr 
-                        key={prize.id} 
+                      <tr
+                        key={prize.id}
                         className={`border-t hover:bg-muted/30 ${selectedPrizes.has(prize.id) ? 'bg-blue-50' : ''}`}
                       >
                         <td className="p-3">
@@ -1090,6 +1095,23 @@ export default function PrizeDistributionPage() {
                               <Square className="h-5 w-5 text-muted-foreground" />
                             )}
                           </button>
+                        </td>
+                        <td className="p-3">
+                          <div className="w-10 h-10 rounded border bg-gray-50 overflow-hidden flex items-center justify-center shrink-0">
+                            {prize.imageUrl ? (
+                              <img
+                                src={getImageUrl(prize.imageUrl)}
+                                alt=""
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  e.target.onerror = null;
+                                  e.target.style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              <Trophy className="w-5 h-5 text-gray-300" />
+                            )}
+                          </div>
                         </td>
                         <td className="p-3">
                           <div className="font-medium">{prize.name}</div>
@@ -1168,7 +1190,7 @@ export default function PrizeDistributionPage() {
               Cliquez sur la carte pour sélectionner l'emplacement du prix
             </DialogDescription>
           </DialogHeader>
-          
+
           <form onSubmit={handleCreatePrize} className="space-y-4">
             {/* Map for location selection */}
             <div className="h-[250px] rounded-lg overflow-hidden border">
@@ -1182,7 +1204,7 @@ export default function PrizeDistributionPage() {
                 defaultZoom={13}
               />
             </div>
-            
+
             {selectedLocation && (
               <div className="p-2 bg-blue-50 rounded text-sm">
                 <strong>Position:</strong> {selectedLocation.lat.toFixed(5)}, {selectedLocation.lng.toFixed(5)}
@@ -1329,7 +1351,20 @@ export default function PrizeDistributionPage() {
               </div>
             )}
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="md:col-span-3">
+                <label className="text-sm font-medium mb-2 block">Image du Prix</label>
+                <div className="bg-gray-50/50 p-4 rounded-md border border-dashed border-gray-200">
+                  <ImageUpload
+                    value={formData.imageUrl}
+                    onChange={(url) => setFormData(prev => ({ ...prev, imageUrl: url }))}
+                    onUpload={uploadPrizeImage}
+                    placeholder="Image du prix"
+                  />
+                  <p className="text-[11px] text-gray-400 mt-2">Visible par les utilisateurs sur la carte et dans leur inventaire.</p>
+                </div>
+              </div>
+
               <div>
                 <label className="text-sm font-medium">Ville</label>
                 <select
@@ -1518,8 +1553,8 @@ export default function PrizeDistributionPage() {
             <Button variant="outline" onClick={() => setShowBatchDialog(false)}>
               Annuler
             </Button>
-            <Button 
-              onClick={handleBatchDistribution} 
+            <Button
+              onClick={handleBatchDistribution}
               disabled={!distributionArea || !batchForm.name?.trim()}
               className="bg-orange-500 hover:bg-orange-600"
             >
@@ -1551,10 +1586,10 @@ export default function PrizeDistributionPage() {
               height="300px"
               showCitySelector={true}
             />
-            
+
             {distributionArea && (
               <div className="p-2 bg-yellow-50 rounded text-sm border border-yellow-200">
-                <strong>Estimation:</strong> ~{((Math.PI * Math.pow(distributionArea.radius/1000, 2)) * autoForm.density).toFixed(0)} prix seront créés dans cette zone
+                <strong>Estimation:</strong> ~{((Math.PI * Math.pow(distributionArea.radius / 1000, 2)) * autoForm.density).toFixed(0)} prix seront créés dans cette zone
               </div>
             )}
 
@@ -1652,7 +1687,7 @@ export default function PrizeDistributionPage() {
               <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
                 <h4 className="font-medium text-yellow-800 mb-2">Aperçu de la distribution</h4>
                 <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>📍 ~<strong>{((Math.PI * Math.pow(distributionArea.radius/1000, 2)) * autoForm.density).toFixed(0)}</strong> prix estimés</div>
+                  <div>📍 ~<strong>{((Math.PI * Math.pow(distributionArea.radius / 1000, 2)) * autoForm.density).toFixed(0)}</strong> prix estimés</div>
                   <div>🎯 Zone de <strong>{Math.round(distributionArea.radius)}m</strong> de rayon</div>
                   <div>⭐ <strong>{autoForm.points}</strong> points chacun</div>
                   <div>📦 Rareté: <strong>{RARITY_OPTIONS.find(r => r.value === autoForm.rarity)?.label}</strong></div>
@@ -1665,8 +1700,8 @@ export default function PrizeDistributionPage() {
             <Button variant="outline" onClick={() => setShowAutoDialog(false)}>
               Annuler
             </Button>
-            <Button 
-              onClick={handleAutoDistribution} 
+            <Button
+              onClick={handleAutoDistribution}
               disabled={!distributionArea || !autoForm.title?.trim()}
               className="bg-yellow-500 hover:bg-yellow-600"
             >
@@ -1829,6 +1864,6 @@ export default function PrizeDistributionPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   );
 }

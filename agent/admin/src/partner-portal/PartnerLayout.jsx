@@ -1,10 +1,22 @@
 import { Link, useLocation } from 'react-router-dom';
 import { LogOut, Store, ShoppingBag, QrCode } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { getImageUrl } from '../utils/images';
+import { useState, useEffect } from 'react';
+import partnerService from '../services/redemptions-partner';
 
 export default function PartnerLayout({ children }) {
   const { pathname } = useLocation();
   const { user, logout } = useAuth();
+  const [partnerLogo, setPartnerLogo] = useState(null);
+
+  useEffect(() => {
+    if (user?.partnerId) {
+      partnerService.getPartnerProfile().then(profile => {
+        if (profile?.logo) setPartnerLogo(profile.logo);
+      }).catch(err => console.error('Failed to load partner logo', err));
+    }
+  }, [user?.partnerId]);
 
   const navItems = [
     { label: 'Tableau de bord', to: '/partner-portal', icon: QrCode },
@@ -18,11 +30,15 @@ export default function PartnerLayout({ children }) {
       <header className="border-b bg-white/80 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold text-lg shadow-sm">
-              Y!
+            <div className="h-10 w-10 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold text-lg shadow-sm overflow-hidden">
+              {partnerLogo ? (
+                <img src={getImageUrl(partnerLogo)} alt="Logo" className="w-full h-full object-cover" />
+              ) : (
+                "Y!"
+              )}
             </div>
             <div>
-              <div className="text-lg font-semibold">Portail Partenaire</div>
+              <div className="text-lg font-semibold">{user?.displayName || 'Portail Partenaire'}</div>
               <div className="text-xs text-slate-500">{user?.email}</div>
             </div>
           </div>

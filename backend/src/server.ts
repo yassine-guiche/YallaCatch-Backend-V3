@@ -192,6 +192,7 @@ async function createServer(): Promise<FastifyInstance> {
       },
     },
     crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
   });
 
   // Compression support
@@ -459,7 +460,7 @@ async function start(): Promise<void> {
     await registerRoutes(server);
 
     // Setup WebSocket
-    await setupWebSocket(server);
+    // await setupWebSocket(server);
 
     // Start scheduled jobs (analytics, cleanup, notifications)
     try {
